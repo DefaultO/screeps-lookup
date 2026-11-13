@@ -410,7 +410,8 @@ function loadContent() {
     const dir = path.join(ROOT, 'content');
     const packsDir = path.join(dir, 'packs');
     let packs = fs.existsSync(packsDir) ? fs.readdirSync(packsDir).filter(n => fs.statSync(path.join(packsDir, n)).isDirectory()).sort() : [];
-    if (ONLY_PACK) {
+    if (ONLY_PACK === 'none') packs = [];   // the base content alone
+    else if (ONLY_PACK) {
         if (!packs.includes(ONLY_PACK)) die(`no pack "${ONLY_PACK}" in content/packs`);
         packs = [ONLY_PACK];
     }
@@ -521,7 +522,7 @@ function applyContent(entries, constants, meta) {
             const id = 'mechanic:' + m.id, where = `${c.name}/mechanics: ${m.id}`;
             if (made.has(id)) die(`${where}: a mechanic with this id exists already`);
             if (!m.title || !m.summary) die(`${where}: title and summary are required`);
-            const e = { id, kind: 'mechanic', name: m.title, title: m.title, summary: fill(m.summary, where), url: m.url || undefined };
+            const e = { id, kind: 'mechanic', name: m.title, title: m.title, topic: m.topic || c.pack || 'core', summary: fill(m.summary, where), url: m.url || undefined };
             addCommon(e, m, where);
             if (m.viz) e.viz = m.viz;
             made.set(id, e); mechEntries.push(e);
@@ -530,7 +531,7 @@ function applyContent(entries, constants, meta) {
             const id = 'recipe:' + r.id, where = `${c.name}/recipes: ${r.id}`;
             if (made.has(id)) die(`${where}: a recipe with this id exists already`);
             if (!r.title || !r.summary || !r.steps || !r.steps.length) die(`${where}: title, summary and steps are required`);
-            const e = { id, kind: 'recipe', name: r.title, title: r.title, summary: fill(r.summary, where), steps: r.steps.map(s => ({ call: s.call || undefined, text: fill(s.text, where) })), url: r.url || undefined };
+            const e = { id, kind: 'recipe', name: r.title, title: r.title, topic: r.topic || c.pack || 'core', summary: fill(r.summary, where), steps: r.steps.map(s => ({ call: s.call || undefined, text: fill(s.text, where) })), url: r.url || undefined };
             addCommon(e, r, where);
             made.set(id, e); recipeEntries.push(e);
         }
@@ -588,6 +589,7 @@ function main() {
                 ' come from the Screeps documentation (docs.screeps.com, CC BY 4.0, shortened). Constant values come from @screeps/common; behaviour notes cite screeps/engine, screeps/driver and screeps/backend-local (ISC, © Artem Chivchalov). Summaries, tasks, pitfalls, mechanics and recipes are written for this index. Not affiliated with Screeps.',
             sources: meta,
             counts,
+            topics: require(path.join(ROOT, 'content/topics.js')),
         },
         constants,
         constantNotes: applied.notes,

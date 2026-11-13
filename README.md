@@ -58,9 +58,10 @@ An entry has: `id`, `kind`, `signature`, `cpu` (`intent` = +0.2 CPU when it retu
 ## Rebuild
 
 ```sh
-node tools/fetch-sources.js     # clone or update screeps/docs, common, engine, backend-local into sources/
+node tools/fetch-sources.js     # clone or update screeps/docs, common, engine, driver, backend-local into sources/
 node tools/build.js             # writes data/index.json, site/index.js, site/index.html
-node tools/test.js              # 68 task queries with the entries they must find, plus index checks
+node tools/test.js              # the task queries with the entries they must find, plus index checks
+node tools/audit.js --list      # what is still thin: members without own text, lines without a source, constants without a meaning
 ```
 
 The build fails, with the entry named, when a cited engine line no longer exists, when a constant
@@ -73,11 +74,18 @@ On Windows keep the folder path short: git fails with "Filename too long" in ver
 
 ## Add or correct content
 
+[CONTRIBUTING.md](CONTRIBUTING.md) has the formats and the rules. In short: every line that states
+behaviour carries what proves it (a line of engine, driver or backend code, or an official docs
+page); the build turns that into a link with a line number and fails when the code is gone.
+Numbers are written as expressions over the constants.
+
 | file | holds |
 | --- | --- |
-| `content/api-*.js` | own text per API entry: summary, tasks, pitfalls, notes, constants, see, engine references |
-| `content/mechanics.js`, `content/recipes.js` | the mechanics and recipes |
+| `content/api-*.js` | own text per API entry: summary, tasks, pitfalls, notes, constants, see |
+| `content/mechanics.js`, `content/recipes.js` | the core mechanics and recipes |
+| `content/packs/<topic>/` | one folder per topic area with its own `api.js`, `mechanics.js`, `recipes.js`, `constant-notes.js`, `queries.json` |
 | `content/constants.js` | constant groups and their tables |
+| `content/topics.js` | names and order of the topics that group mechanics and recipes |
 | `content/cheatsheet.js` | the numbers on the start page |
 | `site-src/index.html` | the page template; the build inlines `lib/search.js` into it |
 | `content/synonyms.js` | word groups ("refill", "fill", "supply" → transfer), phrases ("do not own"), stop words |
