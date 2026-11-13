@@ -229,6 +229,8 @@ td.up { font-weight: 700; color: var(--ink); }
 .res .rs { display: block; color: var(--ink-2); margin-top: 2px; font-size: 14px; }
 .res .lines { margin-top: 6px; font-size: 13.5px; color: var(--ink-2); gap: 4px; }
 .empty { color: var(--ink-2); padding: 24px 0; }
+.gloss { margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 14px; color: var(--ink-2); }
+.gloss b { font: 600 13.5px var(--mono); color: var(--ink); margin-right: 6px; }
 
 /* ---- entry page */
 .crumbs { font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -624,6 +626,11 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     var res = (state.k ? all.filter(function (r) { return group(r.entry) === state.k; }) : all).slice(0, 12);
     shown = res.map(function (r) { return r.entry.id; });
     var consts = (state.q.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g) || []).map(constHtml).join('');
+    // community words in the query, explained in one line each
+    consts = engine.glossary(state.q).map(function (g) {
+      var t = engine.get(g.entry);
+      return '<p class="gloss"><b>' + esc(g.term) + '</b> ' + rich(g.means) + ' <a href="' + href(g.entry) + '">' + esc(t ? label(t) : g.entry) + ' →</a></p>';
+    }).join('') + consts;
     if (!res.length && !consts) {
       return '<p class="empty">Nothing matches “' + esc(state.q) + '”. Try the verb and the thing (repair road, boost creep), a method name, or a constant such as <code>ROAD_DECAY_TIME</code>.</p>';
     }

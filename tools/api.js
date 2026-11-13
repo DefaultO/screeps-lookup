@@ -213,6 +213,9 @@ if (optJson) {
 }
 const consts = (query.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g) || []).map(showConst).filter(Boolean);
 if (consts.length) console.log(consts.join('\n') + '\n');
+// community words in the query, explained in one line each
+const slang = engine.glossary(query);
+if (slang.length) console.log(slang.map(g => wrap(`${g.term}: ${g.means}  (${g.entry})`, 4, '')).join('\n') + '\n');
 if (!results.length) { console.log('nothing found. Try other words, or --list to see what is there.'); process.exit(1); }
 results.slice(0, optN).forEach((r, i) => {
     console.log(render(r.entry, i === 0 ? 'long' : 'medium', `${i + 1}. `, r.lines));

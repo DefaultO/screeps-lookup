@@ -625,6 +625,20 @@ function main() {
             return { label: fill(r.label, 'cheatsheet'), value: fill(r.value, 'cheatsheet'), unit: fill(r.unit || '', 'cheatsheet'), to: r.to };
         }),
     }));
+    // glossary: the community's words, each pointing at the entry that explains it
+    // (content/glossary.json and content/packs/<name>/glossary.json)
+    const glossary = [];
+    const glossaryFiles = [path.join(ROOT, 'content/glossary.json')].concat(loadContent().filter(c => c.pack).map(c => path.join(ROOT, 'content/packs', c.pack, 'glossary.json')));
+    for (const file of glossaryFiles) {
+        if (!fs.existsSync(file)) continue;
+        for (const g of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+            const where = path.relative(ROOT, file) + ': ' + g.term;
+            if (!g.term || !g.means || !g.entry) die(`${where}: term, means and entry are required`);
+            if (!known.has(g.entry)) die(`${where}: points to unknown entry ${g.entry}`);
+            if (glossary.some(x => x.term.toLowerCase() === g.term.toLowerCase())) die(`${where}: term is defined twice`);
+            glossary.push({ term: g.term, means: fill(g.means, where), words: g.words || [], entry: g.entry });
+        }
+    }
     const counts = {};
     for (const e of entries) counts[e.kind] = (counts[e.kind] || 0) + 1;
     const index = {
@@ -640,6 +654,7 @@ function main() {
         constants,
         constantNotes: applied.notes,
         lineSources,
+        glossary,
         synonyms,
         cheats,
         entries,
