@@ -247,7 +247,7 @@ module.exports = {
                 eng(I + 'room/destroy-structure.js', "require('../structures/_destroy')(object, scope);")),
         ],
         notes: [
-            L('{{DISMANTLE_POWER}} hits per WORK per tick; returns {{DISMANTLE_COST}} energy per hit ({{DISMANTLE_POWER * DISMANTLE_COST}} per WORK per tick). Energy that does not fit is dropped.',
+            L('{{DISMANTLE_POWER}} hits per WORK per tick; returns {{DISMANTLE_COST}} energy per hit, rounded down per call: {{Math.ceil(1 / (DISMANTLE_POWER * DISMANTLE_COST))}} unboosted WORK parts give 1 energy per tick, fewer give nothing. Energy that does not fit is dropped.',
                 eng(P + 'dismantle.js', 'var power = utils.calcBodyEffectiveness'),
                 eng(P + 'dismantle.js', 'energyGain = Math.floor(amount * C.DISMANTLE_COST);'),
                 eng(P + 'dismantle.js', "require('./drop')(object, {amount: usedSpace - object.storeCapacity, resourceType: 'energy'}, scope);")),
