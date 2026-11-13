@@ -163,6 +163,10 @@ td.up { font-weight: 700; color: var(--ink); }
 .consts div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 10px; padding: 4px 0; border-bottom: 1px solid var(--rule-2); min-width: 0; }
 .consts dt { font: 12px var(--mono); color: var(--ink-2); overflow-wrap: break-word; min-width: 0; }
 .consts dd { margin: 0 0 0 auto; font: 600 12.5px var(--mono); text-align: right; overflow-wrap: anywhere; }
+.consts.wide { grid-template-columns: minmax(0, 1fr); }
+.consts .cn { flex-basis: 100%; margin: 0 0 2px; color: var(--ink-3); font-size: 13px; }
+.cite { font: 500 10.5px/1.5 var(--mono); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; white-space: nowrap; vertical-align: 1px; }
+.cite:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
 .codes { display: flex; flex-wrap: wrap; gap: 5px; }
 .codes span { font: 12px var(--mono); padding: 1px 7px; border-radius: 5px; background: var(--code); color: var(--ink-2); }
 .codes span b { color: var(--ink-3); font-weight: 500; margin-left: 4px; }
@@ -645,7 +649,13 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     return p;
   }
   function section(name, html, cls) { return '<section class="sec' + (cls ? ' ' + cls : '') + '"><h3 class="sh">' + esc(name) + '</h3>' + html + '</section>'; }
-  function lineList(items, mk, cls) { return '<ul class="lines' + (cls ? ' ' + cls : '') + '">' + items.map(function (t) { return '<li>' + rich(t, mk) + '</li>'; }).join('') + '</ul>'; }
+  // links to what proves a line: engine code at a line number, or a page of the official docs
+  function cites(list) {
+    if (!list || !list.length) return '';
+    return ' ' + list.map(function (s) { return '<a class="cite" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
+  }
+  // items: [{t, src}]
+  function lineList(items, mk, cls) { return '<ul class="lines' + (cls ? ' ' + cls : '') + '">' + items.map(function (x) { return '<li>' + rich(x.t, mk) + cites(x.src) + '</li>'; }).join('') + '</ul>'; }
   function seeLink(id) { var t = engine.get(id), api = !t || isApi(t); return '<a' + (api ? ' class="mono"' : '') + ' href="' + href(id) + '">' + esc(api ? id : t.title) + '</a>'; }
 
   // the tiles a creep reaches at this range, on the game's square grid
@@ -782,18 +792,19 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     if (e.deprecated && e.deprecated !== true) h += '<p class="dep-note">Deprecated. ' + rich(e.deprecated) + '</p>';
     h += factStrip(e);
 
-    var picked = {};
+    var picked = {}, KEY = { fact: 'facts', pitfall: 'pitfalls', note: 'notes' };
+    var srcOf = function (kind, i) { return ((e.src || {})[KEY[kind]] || {})[i]; };
     if (opts.lines && opts.lines.length) {
       opts.lines.forEach(function (l) { picked[l.kind + l.index] = true; });
       h += '<div class="hit"><h3 class="sh">For your question</h3><ul class="lines">' + opts.lines.map(function (l) {
-        return '<li>' + (l.kind === 'pitfall' ? '<span class="tag">Watch out</span>' : '') + rich(l.text, mk) + '</li>';
+        return '<li>' + (l.kind === 'pitfall' ? '<span class="tag">Watch out</span>' : '') + rich(l.text, mk) + cites(srcOf(l.kind, l.index)) + '</li>';
       }).join('') + '</ul></div>';
     }
     // the remaining lines; on a result they fold away when some were picked
     function rest(kind, list, name, cls, restName) {
       if (!list || !list.length) return;
       var items = [];
-      list.forEach(function (x, i) { if (!picked[kind + i]) items.push(x); });
+      list.forEach(function (x, i) { if (!picked[kind + i]) items.push({ t: x, src: srcOf(kind, i) }); });
       if (!items.length) return;
       var listHtml = lineList(items, mk, cls);
       var title = items.length < list.length ? restName : name;
@@ -824,7 +835,9 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
 
     if (e.constants) {
       var cs = e.kind === 'constants' && !opts.full ? e.constants.slice(0, 18) : e.constants;
-      h += section('Constants', '<dl class="consts">' + cs.map(function (c) { return '<div><dt>' + esc(c.name) + '</dt><dd>' + (c.value !== undefined ? esc(c.value) : '…') + '</dd></div>'; }).join('') + '</dl>' +
+      h += section('Constants', '<dl class="consts' + (e.kind === 'constants' && opts.full ? ' wide' : '') + '">' + cs.map(function (c) {
+        return '<div><dt>' + esc(c.name) + '</dt><dd>' + (c.value !== undefined ? esc(c.value) : '…') + '</dd>' + (c.note && opts.full ? '<p class="cn">' + rich(c.note) + '</p>' : '') + '</div>';
+      }).join('') + '</dl>' +
         (cs.length < e.constants.length ? '<p class="note"><a href="' + href(e.id) + '">All ' + e.constants.length + ' constants</a></p>' : ''));
     }
     if (e.members && opts.full) h += membersHtml(e);
@@ -856,6 +869,7 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     var g = c.group && engine.get(c.group);
     return '<article class="answer" style="margin-bottom:12px"><p class="eyebrow">Constant</p><div class="title"><h2><span class="mono">' + esc(name) + '</span></h2></div>' +
       '<div class="sig"><pre>' + esc(v.length > 1500 ? v.slice(0, 1500) + ' …' : v) + '</pre><button class="copy" type="button" data-copy="' + esc(name) + '">Copy</button></div>' +
+      ((index.constantNotes || {})[name] ? '<p class="lead">' + rich(index.constantNotes[name]) + '</p>' : '') +
       (g ? '<p class="note">In <a href="' + href(g.id) + '">' + esc(g.title) + '</a></p>' : '') + '</article>';
   }
 

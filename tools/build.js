@@ -6,11 +6,14 @@
  *   sources/common         (@screeps/common: lib/constants.js)
  *   sources/engine         (screeps/engine: line anchors for behaviour notes)
  *   sources/backend-local  (screeps/backend-local: invader raid generation)
+ *   sources/driver         (screeps/driver: the runtime around a player script: CPU, memory, intents)
  *   content/*.js           (own text: summaries, tasks, pitfalls, mechanics, recipes, synonyms)
  *
- * Usage: node tools/build.js [--sources <dir>] [--no-doc-text]
+ * Usage: node tools/build.js [--sources <dir>] [--no-doc-text] [--pack <name>] [--out <dir>]
  *   --no-doc-text  leave out every sentence taken from the official docs (argument and
  *                  return-code descriptions, first sentences); names, types and codes stay.
+ *   --pack <name>  build the base content plus only content/packs/<name>
+ *   --out <dir>    write index.json and site/ there instead of data/ and site/
  */
 const fs = require('fs');
 const path = require('path');
@@ -30,6 +33,7 @@ const REPOS = {
     common: { github: 'screeps/common', license: 'ISC' },
     engine: { github: 'screeps/engine', license: 'ISC' },
     'backend-local': { github: 'screeps/backend-local', license: 'ISC' },
+    driver: { github: 'screeps/driver', license: 'ISC' },
 };
 
 const problems = [];
@@ -363,45 +367,131 @@ const fileCache = {};
 function resolveEngine(refs, meta, where) {
     return (refs || []).map(ref => {
         const repo = ref.repo || 'engine';
+        if (!REPOS[repo]) die(`${where}: unknown source repository "${repo}"`);
         const file = path.join(SOURCES, repo, ref.file);
-        if (!fs.existsSync(file)) die(`${where}: ${repo}/${ref.file} does not exist any more; recheck the note that cites it`);
+        if (!fs.existsSync(file)) die(`${where}: ${repo}/${ref.file} does not exist any more; recheck the line that cites it`);
         let line;
         if (ref.find) {
             const lines = fileCache[file] || (fileCache[file] = fs.readFileSync(file, 'utf8').split(/\r?\n/));
             const idx = lines.findIndex(l => l.indexOf(ref.find) !== -1);
-            if (idx === -1) die(`${where}: "${ref.find}" not found in ${repo}/${ref.file}; the code changed, recheck the note that cites it`);
+            if (idx === -1) die(`${where}: "${ref.find}" not found in ${repo}/${ref.file}; the code changed, recheck the line that cites it`);
             line = idx + 1;
         }
         const sha = meta[repo].commit || 'master';
-        return { label: ref.label || `${repo}: ${ref.file}`, url: `https://github.com/${REPOS[repo].github}/blob/${sha}/${ref.file}` + (line ? '#L' + line : '') };
+        return { label: ref.label || `${repo} ${path.basename(ref.file)}${line ? ':' + line : ''}`, url: `https://github.com/${REPOS[repo].github}/blob/${sha}/${ref.file}` + (line ? '#L' + line : '') };
     });
+}
+
+// What proves one line of own text:
+//   {file, find, repo?, label?}  a line in screeps/engine (default) or another source repository
+//   {doc: 'Creep.transfer'}      an entry of the official API reference
+//   {doc: 'article:control'}     an official article (file name without .md), optionally with #anchor
+function resolveSrc(ref, meta, where, apiIds) {
+    if (!ref || typeof ref !== 'object') die(`${where}: a source must be an object, got ${JSON.stringify(ref)}`);
+    if (ref.doc) {
+        if (ref.doc.startsWith('article:')) {
+            const [slug, anchor] = ref.doc.slice(8).split('#');
+            if (!fs.existsSync(path.join(SOURCES, 'docs/source', slug + '.md'))) die(`${where}: no official article "${slug}"`);
+            return { label: 'docs: ' + slug, url: DOCS_URL + slug + '.html' + (anchor ? '#' + anchor : '') };
+        }
+        if (!apiIds.has(ref.doc)) die(`${where}: source {doc: "${ref.doc}"} is not an entry of the API reference`);
+        return { label: 'docs: ' + ref.doc, url: DOCS_API_URL + '#' + ref.doc };
+    }
+    return resolveEngine([ref], meta, where)[0];
+}
+
+const ONLY_PACK = opt('--pack');
+const OUT = opt('--out') ? path.resolve(opt('--out')) : null;
+
+// Content comes from the base files in content/ and from topic packs in content/packs/<name>/
+// (api.js, mechanics.js, recipes.js, constant-notes.js, queries.json). --pack <name> builds the
+// base plus that one pack, so a pack can be checked on its own.
+function loadContent() {
+    const dir = path.join(ROOT, 'content');
+    const packsDir = path.join(dir, 'packs');
+    let packs = fs.existsSync(packsDir) ? fs.readdirSync(packsDir).filter(n => fs.statSync(path.join(packsDir, n)).isDirectory()).sort() : [];
+    if (ONLY_PACK) {
+        if (!packs.includes(ONLY_PACK)) die(`no pack "${ONLY_PACK}" in content/packs`);
+        packs = [ONLY_PACK];
+    }
+    const load = file => (fs.existsSync(file) ? require(file) : null);
+    const list = x => (!x ? { entries: [], extend: {} } : Array.isArray(x) ? { entries: x, extend: {} } : { entries: x.entries || [], extend: x.extend || {} });
+    return [{ name: 'content', api: require(path.join(dir, 'api.js')), mechanics: list(require(path.join(dir, 'mechanics.js'))), recipes: list(require(path.join(dir, 'recipes.js'))), notes: load(path.join(dir, 'constant-notes.js')) }]
+        .concat(packs.map(p => {
+            const d = path.join(packsDir, p);
+            return { name: 'packs/' + p, pack: p, api: load(path.join(d, 'api.js')), mechanics: list(load(path.join(d, 'mechanics.js'))), recipes: list(load(path.join(d, 'recipes.js'))), notes: load(path.join(d, 'constant-notes.js')) };
+        }));
 }
 
 function applyContent(entries, constants, meta) {
     const fill = makeFill(constants);
-    const fillList = (l, where) => (l || []).map(x => fill(x, where));
     const byId = new Map(entries.map(e => [e.id, e]));
-    const api = require(path.join(ROOT, 'content/api.js'));
-    const mechanics = require(path.join(ROOT, 'content/mechanics.js'));
-    const recipes = require(path.join(ROOT, 'content/recipes.js'));
+    const apiIds = new Set(entries.map(e => e.id));
+    const content = loadContent();
     const groups = require(path.join(ROOT, 'content/constants.js'));
+    const uniq = a => [...new Set(a)];
 
-    // 1. overlays on API entries
-    for (const [id, o] of Object.entries(api)) {
-        const e = byId.get(id);
-        if (!e) { warn(`content/api.js: ${id} is not in the docs (renamed or removed?)`); continue; }
-        if (o.summary) e.summary = fill(o.summary, id);
-        if (o.tasks) e.tasks = o.tasks;
-        if (o.pitfalls) e.pitfalls = fillList(o.pitfalls, id);
-        if (o.notes) e.notes = fillList(o.notes, id);
-        if (o.constants) e.constants = resolveConstants(o.constants, constants, id);
-        if (o.see) e.see = o.see;
-        if (o.engine) e.engine = resolveEngine(o.engine, meta, id);
-        if (o.range !== undefined) e.range = o.range;
-        if (o.part) e.part = o.part;
+    // lines are strings or {t, src}; texts go to e[key], resolved sources to e.src[key][index]
+    function addLines(e, key, list, where) {
+        if (!list || !list.length) return;
+        const at = (e[key] || []).length;
+        e[key] = e[key] || [];
+        list.forEach((x, i) => {
+            const t = typeof x === 'string' ? x : x && x.t;
+            if (typeof t !== 'string' || !t.trim()) die(`${where}: ${key}[${i}] has no text`);
+            e[key].push(fill(t, where));
+            if (x && x.src) {
+                e.src = e.src || {};
+                e.src[key] = e.src[key] || {};
+                e.src[key][at + i] = [].concat(x.src).map(r => resolveSrc(r, meta, where, apiIds));
+            }
+        });
+    }
+    function addCommon(e, o, where) {
+        if (o.tasks) e.tasks = uniq((e.tasks || []).concat(o.tasks));
+        addLines(e, 'pitfalls', o.pitfalls, where);
+        addLines(e, 'notes', o.notes, where);
+        addLines(e, 'facts', o.facts, where);
+        if (o.constants) {
+            const have = new Set((e.constants || []).map(c => c.name));
+            e.constants = (e.constants || []).concat(resolveConstants(o.constants, constants, where).filter(c => !have.has(c.name)));
+        }
+        if (o.tables) e.tables = (e.tables || []).concat(o.tables.map(t => t(constants)));
+        if (o.see) e.see = uniq((e.see || []).concat(o.see));
+        if (o.engine) e.engine = (e.engine || []).concat(resolveEngine(o.engine, meta, where));
     }
 
-    // 2. constant groups
+    // 1. overlays on API entries: the base first, then the packs, which may add to an entry but not replace its summary
+    for (const c of content) {
+        for (const [id, o] of Object.entries(c.api || {})) {
+            const where = `${c.name}/api: ${id}`;
+            const e = byId.get(id);
+            if (!e || !['method', 'property', 'object'].includes(e.kind)) { warn(`${where} is not in the docs (renamed or removed?)`); continue; }
+            if (o.summary) {
+                if (e.summary && c.pack) die(`${where} already has a summary; add notes or pitfalls instead`);
+                e.summary = fill(o.summary, where);
+            }
+            addCommon(e, o, where);
+            if (o.range !== undefined) e.range = o.range;
+            if (o.part) e.part = o.part;
+        }
+    }
+
+    // 2. constant groups, with a one-line meaning per constant where one is written
+    const notes = {};
+    for (const c of content) {
+        for (const [name, text] of Object.entries(c.notes || {})) {
+            if (!(name in constants)) die(`${c.name}/constant-notes: unknown constant ${name}`);
+            if (notes[name]) die(`${c.name}/constant-notes: ${name} already has a note`);
+            notes[name] = fill(text, `${c.name}/constant-notes: ${name}`);
+        }
+    }
+    const constEntry = n => {
+        const value = showValue(constants[n]);
+        const o = value === null ? { name: n } : { name: n, value };
+        if (notes[n]) o.note = notes[n];
+        return o;
+    };
     const names = Object.keys(constants);
     const taken = new Set();
     const groupEntries = [];
@@ -411,43 +501,48 @@ function applyContent(entries, constants, meta) {
         for (const n of g.names || []) if (!names.includes(n)) warn(`content/constants.js: ${g.id} lists unknown constant ${n}`);
         if (!members.length) { warn(`content/constants.js: group ${g.id} matches nothing`); continue; }
         const id = 'const:' + g.id;
-        const e = { id, kind: 'constants', name: g.title, title: g.title, summary: fill(g.summary || '', id), tasks: g.tasks || [],
-            constants: members.map(n => { const value = showValue(constants[n]); return value === null ? { name: n } : { name: n, value }; }),
-            url: DOCS_API_URL + '#Constants' };
+        const e = { id, kind: 'constants', name: g.title, title: g.title, summary: fill(g.summary || '', id), tasks: g.tasks || [], constants: members.map(constEntry), url: DOCS_API_URL + '#Constants' };
         if (g.tables) e.tables = g.tables.map(t => t(constants));
-        if (g.notes) e.notes = fillList(g.notes, id);
+        addLines(e, 'notes', g.notes, id);
         if (g.see) e.see = g.see;
         groupEntries.push(e);
     }
     const rest = names.filter(n => !taken.has(n));
     if (rest.length) {
         warn(`constants not in any group (listed under "Other constants"): ${rest.join(', ')}`);
-        groupEntries.push({ id: 'const:other', kind: 'constants', name: 'Other constants', title: 'Other constants', summary: 'Constants not sorted into a group yet.', tasks: [],
-            constants: rest.map(n => { const value = showValue(constants[n]); return value === null ? { name: n } : { name: n, value }; }), url: DOCS_API_URL + '#Constants' });
+        groupEntries.push({ id: 'const:other', kind: 'constants', name: 'Other constants', title: 'Other constants', summary: 'Constants not sorted into a group yet.', tasks: [], constants: rest.map(constEntry), url: DOCS_API_URL + '#Constants' });
     }
 
-    // 3. mechanics and recipes
-    const mechEntries = mechanics.map(m => {
-        const id = 'mechanic:' + m.id;
-        const e = { id, kind: 'mechanic', name: m.title, title: m.title, summary: fill(m.summary, id), tasks: m.tasks || [],
-            facts: fillList(m.facts, id), url: m.url || undefined };
-        if (m.pitfalls) e.pitfalls = fillList(m.pitfalls, id);
-        if (m.constants) e.constants = resolveConstants(m.constants, constants, id);
-        if (m.tables) e.tables = m.tables.map(t => t(constants));
-        if (m.viz) e.viz = m.viz;
-        if (m.see) e.see = m.see;
-        if (m.engine) e.engine = resolveEngine(m.engine, meta, id);
-        return e;
-    });
-    const recipeEntries = recipes.map(r => {
-        const id = 'recipe:' + r.id;
-        const e = { id, kind: 'recipe', name: r.title, title: r.title, summary: fill(r.summary, id), tasks: r.tasks || [],
-            steps: r.steps.map(s => ({ call: s.call || undefined, text: fill(s.text, id) })), url: r.url || undefined };
-        if (r.pitfalls) e.pitfalls = fillList(r.pitfalls, id);
-        if (r.constants) e.constants = resolveConstants(r.constants, constants, id);
-        if (r.see) e.see = r.see;
-        return e;
-    });
+    // 3. mechanics and recipes: new ones, then additions to existing ones
+    const made = new Map();
+    const mechEntries = [], recipeEntries = [];
+    for (const c of content) {
+        for (const m of c.mechanics.entries) {
+            const id = 'mechanic:' + m.id, where = `${c.name}/mechanics: ${m.id}`;
+            if (made.has(id)) die(`${where}: a mechanic with this id exists already`);
+            if (!m.title || !m.summary) die(`${where}: title and summary are required`);
+            const e = { id, kind: 'mechanic', name: m.title, title: m.title, summary: fill(m.summary, where), url: m.url || undefined };
+            addCommon(e, m, where);
+            if (m.viz) e.viz = m.viz;
+            made.set(id, e); mechEntries.push(e);
+        }
+        for (const r of c.recipes.entries) {
+            const id = 'recipe:' + r.id, where = `${c.name}/recipes: ${r.id}`;
+            if (made.has(id)) die(`${where}: a recipe with this id exists already`);
+            if (!r.title || !r.summary || !r.steps || !r.steps.length) die(`${where}: title, summary and steps are required`);
+            const e = { id, kind: 'recipe', name: r.title, title: r.title, summary: fill(r.summary, where), steps: r.steps.map(s => ({ call: s.call || undefined, text: fill(s.text, where) })), url: r.url || undefined };
+            addCommon(e, r, where);
+            made.set(id, e); recipeEntries.push(e);
+        }
+    }
+    for (const c of content) {
+        for (const [id, o] of Object.entries(Object.assign({}, c.mechanics.extend, c.recipes.extend))) {
+            const e = made.get(id) || groupEntries.find(g => g.id === id);
+            if (!e) die(`${c.name}: extend points to unknown entry ${id} (use the full id, e.g. mechanic:invaders)`);
+            if (o.summary || o.title || o.steps) die(`${c.name}: extend ${id} may add lines, tables, tasks, constants and links, not replace the entry`);
+            addCommon(e, o, `${c.name}/extend: ${id}`);
+        }
+    }
 
     const all = recipeEntries.concat(mechEntries, entries, groupEntries);
 
@@ -456,8 +551,9 @@ function applyContent(entries, constants, meta) {
     for (const e of all) {
         for (const s of e.see || []) if (!ids.has(s)) die(`${e.id}: "see" points to unknown entry ${s}`);
         for (const s of e.steps || []) if (s.call && !ids.has(s.call)) die(`${e.id}: step calls unknown entry ${s.call}`);
+        if (e.see) e.see = e.see.filter(s => s !== e.id);
     }
-    return all;
+    return { entries: all, notes };
 }
 
 // ---------------------------------------------------------------- output
@@ -465,8 +561,8 @@ function applyContent(entries, constants, meta) {
 function main() {
     const meta = sourceMeta();
     const constants = loadConstants();
-    let entries = parseApi(constants).concat(parseArticles());
-    entries = applyContent(entries, constants, meta);
+    const applied = applyContent(parseApi(constants).concat(parseArticles()), constants, meta);
+    const entries = applied.entries;
     for (const e of entries) {
         if (!e.title) e.title = e.kind === 'method' && e.name === 'constructor' ? 'new ' + e.object : e.id;
         for (const k of Object.keys(e)) if (e[k] === undefined || (Array.isArray(e[k]) && !e[k].length)) delete e[k];
@@ -489,21 +585,23 @@ function main() {
             name: 'Screeps API lookup',
             docText: !NO_DOC_TEXT,
             attribution: 'Signatures, argument names, return codes' + (NO_DOC_TEXT ? '' : ' and the short descriptions of arguments and return codes') +
-                ' come from the Screeps documentation (docs.screeps.com, CC BY 4.0, shortened). Constant values come from @screeps/common, behaviour notes cite screeps/engine and screeps/backend-local (ISC, © Artem Chivchalov). Summaries, tasks, pitfalls, mechanics and recipes are written for this index. Not affiliated with Screeps.',
+                ' come from the Screeps documentation (docs.screeps.com, CC BY 4.0, shortened). Constant values come from @screeps/common; behaviour notes cite screeps/engine, screeps/driver and screeps/backend-local (ISC, © Artem Chivchalov). Summaries, tasks, pitfalls, mechanics and recipes are written for this index. Not affiliated with Screeps.',
             sources: meta,
             counts,
         },
         constants,
+        constantNotes: applied.notes,
         synonyms,
         cheats,
         entries,
     };
     const json = JSON.stringify(index);
-    fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, 'data/index.json'), json);
+    const dataDir = OUT || path.join(ROOT, 'data');
+    const siteDir = OUT ? path.join(OUT, 'site') : path.join(ROOT, 'site');
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(path.join(dataDir, 'index.json'), json);
 
     // site: index.html (page with the search code inlined) + index.js (the index)
-    const siteDir = path.join(ROOT, 'site');
     fs.mkdirSync(siteDir, { recursive: true });
     fs.writeFileSync(path.join(siteDir, 'index.js'), 'window.SCREEPS_API_INDEX=' + json + ';\n');
     const tpl = path.join(ROOT, 'site-src/index.html');
@@ -514,7 +612,7 @@ function main() {
     }
 
     const total = entries.length;
-    console.log(`index: ${total} entries (${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}), ${Object.keys(constants).length} constants, ${(json.length / 1024).toFixed(0)} KB`);
+    console.log(`index: ${total} entries (${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}), ${Object.keys(constants).length} constants, ${(json.length / 1024).toFixed(0)} KB` + (ONLY_PACK ? `  [base + pack ${ONLY_PACK}]` : '') + (OUT ? `  -> ${OUT}` : ''));
     for (const [name, m] of Object.entries(meta)) console.log(`  ${name}: ${m.commit ? m.commit.slice(0, 10) : '?'} ${m.date || ''} ${m.version ? 'v' + m.version : ''}`);
     if (problems.length) {
         console.log(`${problems.length} warning(s):`);

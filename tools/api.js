@@ -119,19 +119,32 @@ function render(e, level, prefix, lines) {
     // the lines that answer the query come first; a secondary result shows only those
     const picked = new Set((lines || []).map(l => l.kind + l.index));
     if (picked.size) out.push(' '.repeat(I) + 'for your question:', lines.map(l => wrap(l.text, I + 4, ' '.repeat(I + 2) + '» ')).join('\n'));
-    const block = (kind, list, name, n) => {
-        if (!list) return;
-        const rest = list.filter((_, i) => !picked.has(kind + i));
+    const block = (kind, key, name, n) => {
+        const all = e[key];
+        if (!all) return;
+        const rest = all.map((t, i) => ({ t, i })).filter(x => !picked.has(kind + x.i));
         if (!rest.length) return;
         const limit = full ? rest.length : long ? (picked.size ? Math.min(rest.length, 3) : rest.length) : (picked.size ? 0 : n);
-        if (limit) out.push(' '.repeat(I) + (picked.size ? 'other ' : '') + name + ':', bullets(rest.slice(0, limit), I + 2));
+        if (limit) {
+            out.push(' '.repeat(I) + (picked.size ? 'other ' : '') + name + ':');
+            for (const x of rest.slice(0, limit)) {
+                out.push(wrap(x.t, I + 4, ' '.repeat(I + 2) + '- '));
+                // --full names what proves the line
+                if (full) for (const s of ((e.src || {})[key] || {})[x.i] || []) out.push(' '.repeat(I + 6) + `source: ${s.label}  ${s.url}`);
+            }
+        }
         if (rest.length > limit) out.push(' '.repeat(I + 2) + `(+${rest.length - limit} more ${name}: --full ${e.id})`);
     };
-    block('fact', e.facts, 'facts', 4);
-    block('pitfall', e.pitfalls, 'pitfalls', 3);
-    block('note', e.notes, 'notes', 2);
+    block('fact', 'facts', 'facts', 4);
+    block('pitfall', 'pitfalls', 'pitfalls', 3);
+    block('note', 'notes', 'notes', 2);
     if (e.tables && long) for (const t of e.tables) out.push(table(t, I));
-    if (e.constants && (long || e.kind !== 'constants')) {
+    if (e.constants && e.kind === 'constants' && full) {
+        // a constant group in full: one constant per line with its meaning
+        out.push(' '.repeat(I) + 'constants:');
+        const w = Math.max(...e.constants.map(c => fmtConst(c).length));
+        for (const c of e.constants) out.push(wrap(fmtConst(c).padEnd(Math.min(w, 46)) + (c.note ? '  ' + c.note : ''), I + 6, ' '.repeat(I + 2)));
+    } else if (e.constants && (long || e.kind !== 'constants')) {
         const list = e.kind === 'constants' && !full ? e.constants.slice(0, 40) : e.constants;
         out.push(wrap('constants: ' + list.map(fmtConst).join(', ') + (list.length < e.constants.length ? `, … (+${e.constants.length - list.length}: --full ${e.id})` : ''), I + 11, ' '.repeat(I)));
     }
@@ -153,7 +166,8 @@ function showConst(name) {
     const c = engine.constant(name);
     if (!c) return null;
     const v = typeof c.value === 'object' && c.value !== null ? JSON.stringify(c.value) : String(c.value);
-    return `${name} = ${v.length > 600 ? v.slice(0, 600) + ' …' : v}${c.group ? `   (${c.group})` : ''}`;
+    const note = (index.constantNotes || {})[name];
+    return `${name} = ${v.length > 600 ? v.slice(0, 600) + ' …' : v}${c.group ? `   (${c.group})` : ''}${note ? '\n    ' + note : ''}`;
 }
 
 // ---------------------------------------------------------------- commands
