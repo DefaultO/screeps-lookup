@@ -90,6 +90,9 @@ h1, h2 { text-wrap: balance; }
 .rail li a.mono { font-size: 12.5px; }
 .rail li a:hover { background: var(--rule-2); color: var(--ink); text-decoration: none; }
 .rail li a[aria-current="page"] { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+.rail li.sub { margin: 9px 0 2px 8px; font: 600 10.5px var(--sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+.tg { font: 600 13.5px var(--sans); color: var(--ink-2); margin: 16px 0 2px; }
+.tg:first-of-type { margin-top: 2px; }
 .rail-h { margin: 14px 0 4px 6px; font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
 
 .ib { flex: none; display: inline-grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--rule); background: var(--surface); border-radius: 9px; padding: 0; }
@@ -167,6 +170,7 @@ td.up { font-weight: 700; color: var(--ink); }
 .consts .cn { flex-basis: 100%; margin: 0 0 2px; color: var(--ink-3); font-size: 13px; }
 .cite { font: 500 10.5px/1.5 var(--mono); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; white-space: nowrap; vertical-align: 1px; }
 .cite:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+.cite.wiki { border-style: dashed; }
 .codes { display: flex; flex-wrap: wrap; gap: 5px; }
 .codes span { font: 12px var(--mono); padding: 1px 7px; border-radius: 5px; background: var(--code); color: var(--ink-2); }
 .codes span b { color: var(--ink-3); font-weight: 500; margin-left: 4px; }
@@ -225,6 +229,8 @@ td.up { font-weight: 700; color: var(--ink); }
 .res .rs { display: block; color: var(--ink-2); margin-top: 2px; font-size: 14px; }
 .res .lines { margin-top: 6px; font-size: 13.5px; color: var(--ink-2); gap: 4px; }
 .empty { color: var(--ink-2); padding: 24px 0; }
+.gloss { margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 14px; color: var(--ink-2); }
+.gloss b { font: 600 13.5px var(--mono); color: var(--ink); margin-right: 6px; }
 
 /* ---- entry page */
 .crumbs { font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -312,6 +318,7 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
  *   engine.get('Creep.transfer');                      // -> entry or undefined
  *   engine.constant('ROAD_DECAY_TIME');                // -> {name, value, group} or undefined
  *   engine.marker('refill a spawn')(text);             // -> [[start, end], ...] words to highlight
+ *   engine.source(n);                                  // -> {label, url}: the proof behind a line
  *
  * Ranking: every query word is looked up directly and through its synonym group in the fields
  * of each entry (name, tasks, summary, body text, constants). A word found in a strong field
@@ -410,6 +417,13 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
         }
         function join(list, pick) { return (list || []).map(pick).join(' \n '); }
 
+        // community words: each leads to its entry (weaker than a written task line) and can be explained
+        var glossaryFor = {};
+        (index.glossary || []).forEach(function (g) {
+            var list = glossaryFor[g.entry] = glossaryFor[g.entry] || [];
+            [g.term].concat(g.words || []).forEach(function (w) { if (list.indexOf(w) === -1) list.push(w); });
+        });
+
         var entries = index.entries;
         var byId = {};
         var constGroup = {};
@@ -419,6 +433,7 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
             if (e.kind === 'constants') consts.forEach(function (n) { constGroup[n] = e; });
             var tables = join(e.tables, function (t) { return t.title + ' ' + t.rows.map(function (r) { return r.join(' '); }).join(' '); });
             var plainId = e.id.replace(PREFIX, '');
+            var slang = glossaryFor[e.id] || [];
             return {
                 entry: e,
                 fields: {
@@ -426,13 +441,14 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
                     tasks: analyse((e.tasks || []).join(' \n ')),
                     summary: analyse(e.summary || e.doc || ''),
                     consts: analyse(consts.join(' ')),
-                    text: analyse([join(e.pitfalls, String), join(e.notes, String), join(e.facts, String), join(e.steps, function (s) { return (s.call || '') + ' ' + s.text; }), e.summary ? e.doc || '' : '', tables].join(' \n ')),
+                    text: analyse([join(e.pitfalls, String), join(e.notes, String), join(e.facts, String), join(e.steps, function (s) { return (s.call || '') + ' ' + s.text; }), e.summary ? e.doc || '' : '', tables, slang.join(' ; ')].join(' \n ')),
                     meta: analyse([e.signature || '', join(e.args, function (a) { return a.name + ' ' + (a.desc || '') + ' ' + join(a.options, function (o) { return o.name; }); }),
                         join(e.returns, function (r) { return r.code; }), e.returnsText || '', e.object || '', e.type || ''].join(' ')),
                 },
                 // the name counts as one more task line, slightly weaker than a written one
                 tasks: (e.tasks || []).map(function (t) { return { text: t, a: analyse(t), words: rawWords(t), w: 1 }; })
-                    .concat([{ text: null, a: analyse(plainId.replace(/\./g, ' ') + ' ' + (e.title || '')), words: rawWords((e.title || e.id).replace(/\./g, ' ')), w: 0.85 }]),
+                    .concat([{ text: null, a: analyse(plainId.replace(/\./g, ' ') + ' ' + (e.title || '')), words: rawWords((e.title || e.id).replace(/\./g, ' ')), w: 0.85 }])
+                    .concat(slang.map(function (w) { return { text: null, a: analyse(w), words: rawWords(w), w: 0.7 }; })),
                 constNames: consts,
                 lines: null,
             };
@@ -599,7 +615,35 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
             return { name: name, value: index.constants[name], group: constGroup[name] ? constGroup[name].id : undefined };
         }
 
-        return { search: search, get: get, constant: constant, marker: marker, entries: entries, meta: index.meta, analyse: analyse };
+        // glossary(query) -> the community words used in the query, longest match first, at most two
+        function glossary(query) {
+            var q = ' ' + String(query).toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ', hits = [];
+            (index.glossary || []).forEach(function (g) {
+                var best = 0;
+                [g.term].concat(g.words || []).forEach(function (w) {
+                    var k = String(w).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                    if (k && q.indexOf(' ' + k + ' ') !== -1 && k.length > best) best = k.length;
+                });
+                if (best) hits.push({ term: g.term, means: g.means, entry: g.entry, len: best });
+            });
+            hits.sort(function (a, b) { return b.len - a.len; });
+            return hits.slice(0, 2);
+        }
+
+        // source(n) -> {label, url, community}: what proves a line; n is a number from entry.src[key][lineIndex]
+        function source(n) {
+            var s = (index.lineSources || [])[n];
+            if (!s) return null;
+            if (s.u) return { label: s.t, url: s.u, community: !!s.c };
+            var m = (index.meta.sources || {})[s.r] || {};
+            return {
+                label: s.t || (s.r + ' ' + s.f.slice(s.f.lastIndexOf('/') + 1) + (s.l ? ':' + s.l : '')),
+                url: (m.repo || 'https://github.com/screeps/' + s.r) + '/blob/' + (m.commit || 'master') + '/' + s.f + (s.l ? '#L' + s.l : ''),
+                community: false
+            };
+        }
+
+        return { search: search, get: get, constant: constant, marker: marker, source: source, glossary: glossary, entries: entries, meta: index.meta, analyse: analyse };
     }
 
     return { create: create, stem: stem };
@@ -646,13 +690,15 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     var p = '';
     if (e.kind === 'method' && e.cpu === 'intent') p += '<span class="pill cost" title="An action: costs 0.2 CPU on top of its run time when it returns OK">0.2 CPU</span>';
     if (e.deprecated) p += '<span class="pill dep">deprecated</span>';
+    if (e.basis === 'practice') p += '<span class="pill" title="What players do, not a rule the game enforces">practice</span>';
     return p;
   }
   function section(name, html, cls) { return '<section class="sec' + (cls ? ' ' + cls : '') + '"><h3 class="sh">' + esc(name) + '</h3>' + html + '</section>'; }
   // links to what proves a line: engine code at a line number, or a page of the official docs
   function cites(list) {
-    if (!list || !list.length) return '';
-    return ' ' + list.map(function (s) { return '<a class="cite" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
+    list = (list || []).map(function (s) { return typeof s === 'number' ? engine.source(s) : s; }).filter(Boolean);
+    if (!list.length) return '';
+    return ' ' + list.map(function (s) { return '<a class="cite' + (s.community ? ' wiki' : '') + '" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.community ? 'Community wiki, not a primary source: ' + s.label : s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
   }
   // items: [{t, src}]
   function lineList(items, mk, cls) { return '<ul class="lines' + (cls ? ' ' + cls : '') + '">' + items.map(function (x) { return '<li>' + rich(x.t, mk) + cites(x.src) + '</li>'; }).join('') + '</ul>'; }
@@ -873,6 +919,18 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
       (g ? '<p class="note">In <a href="' + href(g.id) + '">' + esc(g.title) + '</a></p>' : '') + '</article>';
   }
 
+  // mechanics and recipes in topic order, each topic led by {sub: label} when there is more than one topic
+  function byTopic(list) {
+    var topics = index.meta.topics || {}, order = Object.keys(topics), out = [];
+    list.forEach(function (e) { var t = e.topic || 'core'; if (order.indexOf(t) === -1) order.push(t); });
+    var used = order.filter(function (t) { return list.some(function (e) { return (e.topic || 'core') === t; }); });
+    used.forEach(function (t) {
+      if (used.length > 1) out.push({ sub: topics[t] || t });
+      list.forEach(function (e) { if ((e.topic || 'core') === t) out.push(e); });
+    });
+    return out;
+  }
+
   // ---------------------------------------------------------------- views
   function startPage() {
     var by = function (kind) { return index.entries.filter(function (e) { return e.kind === kind; }); };
@@ -885,8 +943,16 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
           return '<a class="lr" href="' + href(r.to) + '"><span class="ll">' + esc(r.label) + '</span><span class="lv"><b>' + esc(r.value) + '</b>' + (r.unit ? '<span>' + esc(r.unit) + '</span>' : '') + '</span></a>';
         }).join('') + '</div>';
       }).join('') + '</div></section>' +
-      '<section class="block two"><div><h2 class="sh">Recipes</h2><ul class="rows">' + by('recipe').map(row).join('') + '</ul></div>' +
-      '<div><h2 class="sh">Mechanics</h2><ul class="rows">' + by('mechanic').map(row).join('') + '</ul></div></section>';
+      '<section class="block two"><div><h2 class="sh">Recipes</h2>' + grouped(by('recipe')) + '</div>' +
+      '<div><h2 class="sh">Mechanics</h2>' + grouped(by('mechanic')) + '</div></section>';
+    function grouped(list) {
+      var h = '', open = false;
+      byTopic(list).forEach(function (e) {
+        if (e.sub) { h += (open ? '</ul>' : '') + '<h3 class="tg">' + esc(e.sub) + '</h3><ul class="rows">'; open = true; }
+        else { if (!open) { h += '<ul class="rows">'; open = true; } h += row(e); }
+      });
+      return h + (open ? '</ul>' : '');
+    }
   }
 
   function resultsPage() {
@@ -898,6 +964,11 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     var res = (state.k ? all.filter(function (r) { return group(r.entry) === state.k; }) : all).slice(0, 12);
     shown = res.map(function (r) { return r.entry.id; });
     var consts = (state.q.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g) || []).map(constHtml).join('');
+    // community words in the query, explained in one line each
+    consts = engine.glossary(state.q).map(function (g) {
+      var t = engine.get(g.entry);
+      return '<p class="gloss"><b>' + esc(g.term) + '</b> ' + rich(g.means) + ' <a href="' + href(g.entry) + '">' + esc(t ? label(t) : g.entry) + ' →</a></p>';
+    }).join('') + consts;
     if (!res.length && !consts) {
       return '<p class="empty">Nothing matches “' + esc(state.q) + '”. Try the verb and the thing (repair road, boost creep), a method name, or a constant such as <code>ROAD_DECAY_TIME</code>.</p>';
     }
@@ -967,8 +1038,12 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
       '</svg><span>screeps<b>.lookup</b></span></a><nav>' + groups.map(function (g) {
         if (!g) return '<div class="rail-h">API</div>';
         var isOpen = g[0] in open ? open[g[0]] : !!g[4];
+        var items = g[0] === 'recipes' || g[0] === 'mechanics' ? byTopic(g[2]) : g[2];
         return '<details data-g="' + g[0] + '"' + (isOpen ? ' open' : '') + '><summary>' + g[1] + '<span class="n">' + g[2].length + '</span></summary><ul>' +
-          g[2].map(function (e) { return '<li><a' + (g[3] ? ' class="mono"' : '') + ' href="' + href(e.id) + '" data-id="' + esc(e.id) + '">' + esc(label(e)) + '</a></li>'; }).join('') + '</ul></details>';
+          items.map(function (e) {
+            if (e.sub) return '<li class="sub">' + esc(e.sub) + '</li>';
+            return '<li><a' + (g[3] ? ' class="mono"' : '') + ' href="' + href(e.id) + '" data-id="' + esc(e.id) + '">' + esc(label(e)) + '</a></li>';
+          }).join('') + '</ul></details>';
       }).join('') + '</nav>';
     rail.addEventListener('toggle', function (ev) {
       var d = ev.target; if (!d.dataset || !d.dataset.g) return;

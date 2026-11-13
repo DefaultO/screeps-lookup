@@ -12,11 +12,6 @@ module.exports = {
         see: ['mechanic:ps-differences', 'recipe:ps-admin-db'],
     },
     'Game.shard': {
-        notes: [
-            L('On a private server `name` is the host name of the server machine, `type` is `normal` and `ptr` is false.',
-                driver('lib/index.js', 'value: "${os.hostname()}",'),
-                driver('lib/index.js', "value: 'normal',")),
-        ],
         see: ['mechanic:ps-differences'],
     },
 };

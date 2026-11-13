@@ -396,7 +396,6 @@ module.exports = {
                 L('The owner can build non-walkable structures on tiles where hostile creeps stand.', eng(P + 'creeps/build.js', 'const blockingCreeps = mySafeMode ? myCreepsInTile : creepsInTile;')),
                 L('The blocked calls return ERR_NO_BODYPART; withdraw returns ERR_NOT_OWNER.', eng(CREEPS, 'if(this.room.controller && !this.room.controller.my && this.room.controller.safeMode) {', 'engine: the check, first in withdraw, then in each blocked call')),
                 L('Power creeps of other players cannot use enableRoom or usePower in the room.', doc('StructureController')),
-                L('A nuke that ends a safe mode clears the cooldown as well.', eng(P + 'nukes/tick.js', 'safeModeCooldown: null')),
                 L('The cooldown also starts when the controller loses a level or the room is unclaimed. There is none in novice areas.',
                     eng(P + 'controllers/tick.js', 'object.safeModeCooldown = roomInfo.novice > Date.now() ? null : gameTime + C.SAFE_MODE_COOLDOWN'), eng(P + 'controllers/unclaim.js', 'safeModeCooldown: roomInfo.novice > Date.now() ? null : gameTime + C.SAFE_MODE_COOLDOWN,')),
                 L('Of several activateSafeMode calls in one tick only the last one is kept.', eng(STRUCT, "intents.remove(lastActivateSafeMode, 'activateSafeMode');")),
