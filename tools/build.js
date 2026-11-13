@@ -138,6 +138,8 @@ const CPU_CLASS = {
 };
 
 const STATIC_ROOTS = /^(Game|PathFinder|RawMemory|InterShardMemory|Memory)(\.|$)/;
+// members of a class that are called on the class itself
+const STATIC_MEMBERS = new Set(['PowerCreep.create', 'PathFinder.CostMatrix.deserialize']);
 const INSTANCE_NAMES = {
     RoomPosition: 'pos', 'PathFinder.CostMatrix': 'costMatrix', 'Room.Terrain': 'terrain', 'StructureSpawn.Spawning': 'spawn.spawning',
     RoomVisual: 'room.visual', MapVisual: 'Game.map.visual', ConstructionSite: 'site', RoomObject: 'object', OwnedStructure: 'structure',
@@ -237,8 +239,7 @@ function parseApiFile(file, constants) {
             if (cls === undefined) { cls = sig; sig = ''; }
             if (cls === undefined) cls = '0';
             optsJson = a[3];
-            // a member the reference names with its class (PowerCreep.create) is called on the class
-            const isStatic = STATIC_ROOTS.test(id) || name.startsWith(object + '.');
+            const isStatic = STATIC_ROOTS.test(id) || STATIC_MEMBERS.has(id);
             const callee = short === 'constructor' ? 'new ' + object : (isStatic ? id : instanceName(entry.object) + '.' + short);
             entry.signature = String(sig).split('|').map(s => `${callee}(${s.trim()})`).join('  |  ');
             Object.assign(entry, CPU_CLASS[cls] || {});
