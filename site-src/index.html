@@ -356,7 +356,8 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
   function section(name, html, cls) { return '<section class="sec' + (cls ? ' ' + cls : '') + '"><h3 class="sh">' + esc(name) + '</h3>' + html + '</section>'; }
   // links to what proves a line: engine code at a line number, or a page of the official docs
   function cites(list) {
-    if (!list || !list.length) return '';
+    list = (list || []).map(function (s) { return typeof s === 'number' ? engine.source(s) : s; }).filter(Boolean);
+    if (!list.length) return '';
     return ' ' + list.map(function (s) { return '<a class="cite' + (s.community ? ' wiki' : '') + '" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.community ? 'Community wiki, not a primary source: ' + s.label : s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
   }
   // items: [{t, src}]

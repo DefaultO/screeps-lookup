@@ -390,7 +390,8 @@ function resolveEngine(refs, meta, where) {
             line = idx + 1;
         }
         const sha = meta[repo].commit || 'master';
-        return { label: ref.label || `${repo} ${path.basename(ref.file)}${line ? ':' + line : ''}`, url: `https://github.com/${REPOS[repo].github}/blob/${sha}/${ref.file}` + (line ? '#L' + line : '') };
+        return { label: ref.label || `${repo} ${path.basename(ref.file)}${line ? ':' + line : ''}`, url: `https://github.com/${REPOS[repo].github}/blob/${sha}/${ref.file}` + (line ? '#L' + line : ''),
+            compact: { r: repo, f: ref.file, l: line, t: ref.label } };
     });
 }
 
@@ -477,7 +478,7 @@ function applyContent(entries, constants, meta) {
         }
         if (o.tables) e.tables = (e.tables || []).concat(o.tables.map(t => t(constants)));
         if (o.see) e.see = uniq((e.see || []).concat(o.see));
-        if (o.engine) e.engine = (e.engine || []).concat(resolveEngine(o.engine, meta, where));
+        if (o.engine) e.engine = (e.engine || []).concat(resolveEngine(o.engine, meta, where).map(s => ({ label: s.label, url: s.url })));
     }
 
     // 1. overlays on API entries: the base first, then the packs, which may add to an entry but not replace its summary
@@ -597,6 +598,22 @@ function main() {
         if (!e.title) e.title = e.kind === 'method' && e.name === 'constructor' ? 'new ' + e.object : e.id;
         for (const k of Object.keys(e)) if (e[k] === undefined || (Array.isArray(e[k]) && !e[k].length)) delete e[k];
     }
+    // Line sources are stored once: an entry keeps numbers into this list. A code source is kept as
+    // repository, file and line; the reader builds label and link from them (lib/search.js source()).
+    const lineSources = [], sourceAt = new Map();
+    for (const e of entries) {
+        for (const key of Object.keys(e.src || {})) {
+            for (const i of Object.keys(e.src[key])) {
+                e.src[key][i] = e.src[key][i].map(s => {
+                    const c = s.compact ? Object.assign({ r: s.compact.r, f: s.compact.f }, s.compact.l ? { l: s.compact.l } : {}, s.compact.t ? { t: s.compact.t } : {})
+                        : Object.assign({ u: s.url, t: s.label }, s.community ? { c: 1 } : {});
+                    const k = JSON.stringify(c);
+                    if (!sourceAt.has(k)) { sourceAt.set(k, lineSources.length); lineSources.push(c); }
+                    return sourceAt.get(k);
+                });
+            }
+        }
+    }
     const synonyms = require(path.join(ROOT, 'content/synonyms.js'));
     // start page: key numbers, each pointing at the entry that explains it
     const fill = makeFill(constants);
@@ -622,6 +639,7 @@ function main() {
         },
         constants,
         constantNotes: applied.notes,
+        lineSources,
         synonyms,
         cheats,
         entries,

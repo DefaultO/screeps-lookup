@@ -131,7 +131,7 @@ function render(e, level, prefix, lines) {
             for (const x of rest.slice(0, limit)) {
                 out.push(wrap(x.t, I + 4, ' '.repeat(I + 2) + '- '));
                 // --full names what proves the line
-                if (full) for (const s of ((e.src || {})[key] || {})[x.i] || []) out.push(' '.repeat(I + 6) + `source: ${s.label}  ${s.url}`);
+                if (full) for (const n of ((e.src || {})[key] || {})[x.i] || []) { const s = engine.source(n); if (s) out.push(' '.repeat(I + 6) + `source: ${s.label}  ${s.url}`); }
             }
         }
         if (rest.length > limit) out.push(' '.repeat(I + 2) + `(+${rest.length - limit} more ${name}: --full ${e.id})`);
