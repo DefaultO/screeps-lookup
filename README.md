@@ -49,7 +49,7 @@ Put this in the project's `CLAUDE.md` (adjust the path):
 | kind | count | what |
 | --- | --- | --- |
 | method, property, object | 423 | every member of the official API reference, each with own text, signature, arguments, return codes and CPU class |
-| mechanic | 68 | rules that span calls, in ten topics: core rules, structures and creeps, resources and trade, NPCs and the world, power, code/CPU/memory, account/web API/tools, seasonal worlds, private server |
+| mechanic | 68 | rules that span calls, in nine topics: core rules, structures and creeps, resources and trade, NPCs and the world, power, code/CPU/memory, account/web API/tools, seasonal worlds, private server |
 | recipe | 64 | the calls a job needs, in order; 18 of them are marked as community practice |
 | constants | 23 groups | all 423 constants of `@screeps/common` with values and a one-line meaning, plus computed tables |
 | article | 18 | titles and section names of the official articles, as link targets |
