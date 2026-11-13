@@ -14,7 +14,7 @@ const IGNORE_CREEPS = 'if(opts.ignoreCreeps || register.rooms[id].controller && 
 
 module.exports = {
     Room: {
-        summary: 'A 50×50 map tile you currently see. Game.rooms only holds rooms where you have a creep, a structure or observer vision this tick.',
+        summary: 'A 50×50 map tile you currently see. Game.rooms only holds rooms where you have a creep, a power creep, a structure or observer vision this tick.',
         tasks: ['which rooms can I see', 'room visibility'],
         see: ['Game.rooms', 'StructureObserver.observeRoom', 'Room.find'],
     },
@@ -303,7 +303,7 @@ module.exports = {
     Source: { summary: 'An energy source. Refills completely every {{ENERGY_REGEN_TIME}} ticks, counted from the first harvest after a refill.', tasks: ['how sources regenerate'], see: ['mechanic:sources', 'Creep.harvest'] },
     'Source.energy': { summary: 'Energy left in the source right now.', tasks: ['is a source empty'], see: ['Source.ticksToRegeneration', 'mechanic:sources'] },
     'Source.energyCapacity': {
-        summary: '{{SOURCE_ENERGY_CAPACITY}} in an owned or reserved room, {{SOURCE_ENERGY_NEUTRAL_CAPACITY}} in a neutral room, {{SOURCE_ENERGY_KEEPER_CAPACITY}} in a source keeper room.',
+        summary: '{{SOURCE_ENERGY_CAPACITY}} in an owned or reserved room, {{SOURCE_ENERGY_NEUTRAL_CAPACITY}} in a neutral room, {{SOURCE_ENERGY_KEEPER_CAPACITY}} in a room without a controller (source keeper and centre rooms).',
         tasks: ['how much energy does a source hold', 'source capacity in a reserved room'],
         constants: ['SOURCE_ENERGY_CAPACITY', 'SOURCE_ENERGY_NEUTRAL_CAPACITY', 'SOURCE_ENERGY_KEEPER_CAPACITY'],
         see: ['mechanic:sources', 'mechanic:reservation'],

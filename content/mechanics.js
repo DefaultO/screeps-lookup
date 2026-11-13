@@ -574,7 +574,7 @@ module.exports = [
         summary: 'A source refills to its capacity every {{ENERGY_REGEN_TIME}} ticks. The capacity depends on the room.',
         tasks: ['how much energy does a source give per tick', 'source capacity in a reserved room', 'how many WORK parts per source', 'energy income of a remote room'],
         facts: [
-            L('Capacity: {{SOURCE_ENERGY_CAPACITY}} in owned and reserved rooms, {{SOURCE_ENERGY_NEUTRAL_CAPACITY}} in neutral rooms, {{SOURCE_ENERGY_KEEPER_CAPACITY}} in source keeper rooms.',
+            L('Capacity: {{SOURCE_ENERGY_CAPACITY}} in owned and reserved rooms, {{SOURCE_ENERGY_NEUTRAL_CAPACITY}} in neutral rooms, {{SOURCE_ENERGY_KEEPER_CAPACITY}} in rooms without a controller (source keeper and centre rooms).',
                 eng(P + 'sources/tick.js', 'bulk.update(object, {energyCapacity: C.SOURCE_ENERGY_CAPACITY});'),
                 eng(P + 'sources/tick.js', 'energyCapacity: C.SOURCE_ENERGY_NEUTRAL_CAPACITY,'),
                 eng(P + 'sources/tick.js', 'bulk.update(object, {energyCapacity: C.SOURCE_ENERGY_KEEPER_CAPACITY});')),
@@ -698,7 +698,7 @@ module.exports = [
         summary: 'The world is made of 10×10 room sectors. Rooms whose number ends in 0 are highways; the 3×3 block in the middle of a sector holds source keeper rooms around a centre room.',
         tasks: ['which rooms have no controller', 'what is a highway room', 'what is a source keeper room', 'what is a sector', 'where are power banks and deposits'],
         facts: [
-            'Highway rooms (x or y ending in 0): no controller, no sources. Power banks, deposits and portals between shards appear there.',
+            'Highway rooms (x or y ending in 0): no controller, no sources. Power banks and deposits appear there.',
             'Source keeper rooms (x and y ending in 4–6, except 5/5): no controller, sources of {{SOURCE_ENERGY_KEEPER_CAPACITY}}, a mineral, keeper lairs that respawn a keeper.',
             'Centre room (x and y ending in 5): no controller and no keepers; portals appear there.',
             'All other rooms have a controller and can be reserved or claimed.',

@@ -27,7 +27,7 @@ const packsDir = path.join(root, 'content/packs');
 if (fs.existsSync(packsDir)) {
     for (const p of fs.readdirSync(packsDir).sort()) {
         const f = path.join(packsDir, p, 'queries.json');
-        if (!fs.existsSync(f) || (opt('--pack') && opt('--pack') !== p)) continue;
+        if (!fs.existsSync(f) || (opt('--pack') && !opt('--pack').split(',').includes(p))) continue;
         queries = queries.concat(JSON.parse(fs.readFileSync(f, 'utf8')).map(q => Object.assign({ from: 'packs/' + p }, q)));
     }
 }

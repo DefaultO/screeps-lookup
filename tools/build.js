@@ -428,9 +428,10 @@ function loadContent() {
     const packsDir = path.join(dir, 'packs');
     let packs = fs.existsSync(packsDir) ? fs.readdirSync(packsDir).filter(n => fs.statSync(path.join(packsDir, n)).isDirectory()).sort() : [];
     if (ONLY_PACK === 'none') packs = [];   // the base content alone
-    else if (ONLY_PACK) {
-        if (!packs.includes(ONLY_PACK)) die(`no pack "${ONLY_PACK}" in content/packs`);
-        packs = [ONLY_PACK];
+    else if (ONLY_PACK) {               // one pack, or several separated by commas
+        const want = ONLY_PACK.split(',');
+        for (const w of want) if (!packs.includes(w)) die(`no pack "${w}" in content/packs`);
+        packs = packs.filter(p => want.includes(p));
     }
     const load = file => (fs.existsSync(file) ? require(file) : null);
     const list = x => (!x ? { entries: [], extend: {} } : Array.isArray(x) ? { entries: x, extend: {} } : { entries: x.entries || [], extend: x.extend || {} });

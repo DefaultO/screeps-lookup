@@ -29,7 +29,7 @@ module.exports = {
     'Game.rooms': {
         summary: 'The rooms visible this tick, by name.', tasks: ['which rooms can I see', 'loop over my rooms', 'is a room visible'],
         notes: [
-            L('Vision comes from your creeps, your structures and observers. Game.rooms[name] is undefined for a room you have nothing in.',
+            L('Vision comes from your creeps, power creeps and structures, and from observers. Game.rooms[name] is undefined for a room you have nothing in.',
                 driver(DATA, 'roomIdsHash[i.room] = true;'),
                 driver(DATA, 'roomIdsHash[i.observeRoom] = true;'),
                 driver(DATA, "if(i.type == 'flag' || i.type == 'constructionSite') {"),
