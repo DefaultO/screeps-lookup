@@ -90,10 +90,12 @@ module.exports = {
         spawn: ['spawn', 'spawning', 'respawn'],
         constants: ['constant', 'constants', 'value', 'number'],
         simultaneous: ['simultaneous', 'same', 'together', 'once'],
+        user: ['user', 'player', 'account'],
+        raise: ['raise', 'increase', 'set', 'change', 'more'],
     },
     stop: ['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'for', 'from', 'with', 'by', 'is', 'are', 'be', 'do', 'does', 'did', 'i', 'my', 'me', 'we', 'you', 'your', 'it', 'its',
         'this', 'that', 'what', 'which', 'how', 'can', 'could', 'should', 'would', 'will', 'and', 'or', 'if', 'when', 'where', 'there', 'as', 'so', 'into', 'than', 'then',
         'also', 'any', 'some', 'need', 'want', 'way', 'get', 'use', 'using', 'not', 'no', 'up', 'out', 'about', 'has', 'have', 'had', 'was', 'were', 'been', 'much', 'many',
-        'happen', 'happens', 'own', 'another', 'other', 'else', 'through', 'over', 'onto', 'something', 'someone', 'thing', 'things', 'one', 'who', 'why', 'long', 'fast',
+        'happen', 'happens', 'own', 'myself', 'yourself', 'another', 'other', 'else', 'through', 'over', 'onto', 'something', 'someone', 'thing', 'things', 'one', 'who', 'why', 'long', 'fast',
         'per', 'each', 'every', 'they', 'them', 'their', 'still', 'just', 'only', 'am', 'between', 'while', 'after', 'before', 'best', 'mean', 'means'],
 };
