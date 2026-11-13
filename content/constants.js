@@ -2,6 +2,10 @@
 // Constant groups. Every constant of @screeps/common lands in the first group that claims it
 // (by name or by pattern); the build warns about constants that no group claims.
 // tables: functions of the constants returning {title, head, rows, foot}.
+const { L, eng, backend, driver, doc, article, common } = require('./_h');
+const CREEPS = 'src/game/creeps.js';
+const CP = 'src/processor/intents/creeps/';
+const RT = 'lib/runtime/runtime.js';
 
 const HITS = {
     spawn: 'SPAWN_HITS', extension: 'EXTENSION_HITS', road: 'ROAD_HITS', constructedWall: 'WALL_HITS_MAX', link: 'LINK_HITS_MAX', storage: 'STORAGE_HITS',
@@ -91,8 +95,17 @@ module.exports = [
         tasks: ['what does a return code mean', 'error code -9', 'ERR_NOT_IN_RANGE', 'meaning of ERR_BUSY', 'what does -6 mean'],
         match: [/^OK$/, /^ERR_/],
         notes: [
-            'ERR_NOT_OWNER (-1): not your object, or a room owned or reserved by someone else. ERR_BUSY (-4): the creep is still spawning, or the spawn is busy. ERR_NOT_ENOUGH_RESOURCES / _ENERGY / _EXTENSIONS (all -6). ERR_INVALID_TARGET (-7): wrong kind of target, or the target cannot take the action. ERR_FULL (-8). ERR_NOT_IN_RANGE (-9). ERR_INVALID_ARGS (-10). ERR_TIRED (-11): fatigue or cooldown. ERR_NO_BODYPART (-12): no working part of the needed type; also returned for hostile actions in a room under someone else\'s safe mode. ERR_RCL_NOT_ENOUGH (-14). ERR_GCL_NOT_ENOUGH (-15).',
-            'Only a call that returns OK costs the 0.2 CPU intent fee.',
+            L('ERR_NOT_OWNER (-1): not your object, or a room owned or reserved by someone else. ERR_BUSY (-4): the creep is still spawning, or the spawn is busy. ERR_NOT_ENOUGH_RESOURCES / _ENERGY / _EXTENSIONS (all -6). ERR_INVALID_TARGET (-7): wrong kind of target, or the target cannot take the action. ERR_FULL (-8). ERR_NOT_IN_RANGE (-9). ERR_INVALID_ARGS (-10). ERR_TIRED (-11): fatigue or cooldown. ERR_NO_BODYPART (-12): no working part of the needed type; also returned for hostile actions in a room under someone else\'s safe mode. ERR_RCL_NOT_ENOUGH (-14). ERR_GCL_NOT_ENOUGH (-15).',
+                common('lib/constants.js', 'ERR_NOT_OWNER: -1,'),
+                common('lib/constants.js', 'ERR_NOT_ENOUGH_EXTENSIONS: -6,'),
+                eng(CREEPS, 'this.room.controller.reservation && this.room.controller.reservation.username != runtimeData.user.username'),
+                eng(CREEPS, 'if(this.spawning) {'),
+                eng(CREEPS, 'if(data(this.id).fatigue > 0) {'),
+                eng(CREEPS, 'if(!_hasActiveBodypart(this.body, C.ATTACK)) {')),
+            L('Only a call that queues an intent costs the 0.2 CPU fee: one that returns an error code does not, and neither do say and pull.',
+                driver(RT, 'let intentCpu = 0.2,'),
+                driver(RT, 'if (!freeMethods[name] && !this.list[id][name]) {'),
+                driver(RT, 'freeMethods = systemFunctions.Object.create(null, {say: {value: true}, pull:{value:true}});')),
         ],
         see: ['mechanic:cpu', 'mechanic:simultaneous-actions'],
     },
@@ -122,7 +135,15 @@ module.exports = [
         tasks: ['what does a boosted HEAL part heal', 'which compound boosts what', 'boost table', 'what does XGHO2 do', 'boost for upgrading', 'boost for harvesting', 'tough boost'],
         names: ['BOOSTS', 'LAB_BOOST_ENERGY', 'LAB_BOOST_MINERAL', 'LAB_UNBOOST_ENERGY', 'LAB_UNBOOST_MINERAL'],
         tables: [boostTable],
-        notes: ['HEAL with XLHO2 heals {{HEAL_POWER * BOOSTS.heal.XLHO2.heal}} adjacent and {{RANGED_HEAL_POWER * BOOSTS.heal.XLHO2.rangedHeal}} at range. WORK with XUHO2 harvests {{HARVEST_POWER * BOOSTS.work.XUHO2.harvest}}. Build, repair and upgrade boosts add output without using more energy.'],
+        notes: [
+            L('HEAL with XLHO2 heals {{HEAL_POWER * BOOSTS.heal.XLHO2.heal}} adjacent and {{RANGED_HEAL_POWER * BOOSTS.heal.XLHO2.rangedHeal}} at range. WORK with XUHO2 harvests {{HARVEST_POWER * BOOSTS.work.XUHO2.harvest}}. Build, repair and upgrade boosts add output without using more energy.',
+                eng('src/utils.js', 'iPower *= C.BOOSTS[bodyPartType][i.boost][methodName];'),
+                eng(CP + 'heal.js', "var healPower = utils.calcBodyEffectiveness(object.body, C.HEAL, 'heal', C.HEAL_POWER);"),
+                eng(CP + 'harvest.js', "let harvestAmount = utils.calcBodyEffectiveness(object.body, C.WORK, 'harvest', C.HARVEST_POWER);"),
+                eng(CP + 'build.js', 'object.store.energy -= buildEffect;'),
+                eng(CP + 'repair.js', 'repairCost = Math.min(object.store.energy, Math.ceil(repairEffect * C.REPAIR_COST)),'),
+                eng(CP + 'upgradeController.js', 'object.store.energy -= buildEffect;')),
+        ],
         see: ['StructureLab.boostCreep', 'recipe:labs-and-boosts', 'mechanic:damage-and-healing', 'const:reactions'],
     },
     {

@@ -1,7 +1,16 @@
 'use strict';
 // Own text for Room, RoomPosition, base objects, Store, PathFinder and visuals.
+const { L, eng, backend, driver, doc, article, common } = require('./_h');
 const ROOMS = 'src/game/rooms.js';
 const STRUCT = 'src/game/structures.js';
+const GAME = 'src/game/game.js';
+const STORE = 'src/game/store.js';
+const UTILS = 'src/utils.js';
+const P = 'src/processor/intents/';
+const PF = 'lib/path-finder.js';
+const PFC = 'native/src/pf.cc';
+const CONST = 'lib/constants.js';
+const IGNORE_CREEPS = 'if(opts.ignoreCreeps || register.rooms[id].controller && register.rooms[id].controller.safeMode && register.rooms[id].controller.my) {';
 
 module.exports = {
     Room: {
@@ -13,10 +22,17 @@ module.exports = {
         summary: 'List objects of one kind in the room (FIND_* constant), optionally filtered.',
         tasks: ['find all creeps in a room', 'find hostile creeps', 'find structures of a type', 'find sources', 'find construction sites', 'find dropped resources', 'list my spawns', 'find exits'],
         pitfalls: [
-            'FIND_MY_STRUCTURES and FIND_HOSTILE_STRUCTURES only contain structures with an owner. Roads, containers and walls have none: use FIND_STRUCTURES for them.',
-            'FIND_HOSTILE_CREEPS contains every creep that is not yours: invaders, source keepers and allies too.',
-            'The unfiltered list is cached per tick, the filter runs on every call. Filter once and keep the result.',
-            'FIND_SOURCES_ACTIVE leaves out empty sources.',
+            L('FIND_MY_STRUCTURES and FIND_HOSTILE_STRUCTURES only contain structures with an owner. Roads, containers and walls have none: use FIND_STRUCTURES for them.',
+                eng(GAME, '[C.FIND_MY_STRUCTURES]: (i) =>'),
+                eng(GAME, '[C.FIND_HOSTILE_STRUCTURES]: (i) =>'),
+                eng(STRUCT, 'my: (o) => _.isUndefined(o.user) ? undefined : o.user == runtimeData.user._id')),
+            L('FIND_HOSTILE_CREEPS contains every creep that is not yours: invaders, source keepers and allies too.',
+                eng(GAME, '[C.FIND_HOSTILE_CREEPS]: (i) => !i.spawning && !i.my,')),
+            L('The unfiltered list is cached per tick, the filter runs on every call. Filter once and keep the result.',
+                eng(ROOMS, 'result = register.findCache[type][this.name];'),
+                eng(ROOMS, 'result = _.filter(result, opts.filter);')),
+            L('FIND_SOURCES_ACTIVE leaves out empty sources.',
+                eng(GAME, '[C.FIND_SOURCES_ACTIVE]: (i) => i.energy > 0,')),
         ],
         constants: ['FIND_STRUCTURES', 'FIND_MY_STRUCTURES', 'FIND_HOSTILE_CREEPS', 'FIND_MY_CREEPS', 'FIND_SOURCES', 'FIND_SOURCES_ACTIVE', 'FIND_DROPPED_RESOURCES', 'FIND_CONSTRUCTION_SITES', 'FIND_TOMBSTONES', 'FIND_RUINS', 'FIND_MINERALS', 'FIND_DEPOSITS'],
         see: ['const:find', 'RoomPosition.findClosestByRange', 'RoomPosition.findInRange', 'Room.lookForAt', 'Game.getObjectById'],
@@ -29,7 +45,12 @@ module.exports = {
     'Room.lookForAt': {
         summary: 'Objects of one kind (LOOK_* constant) on one tile.',
         tasks: ['is there a structure on this tile', 'is there a creep on this tile', 'get the terrain of a tile', 'find the container under a creep'],
-        pitfalls: ['Always returns an array. LOOK_TERRAIN gives ["plain"], ["swamp"] or ["wall"]; Room.getTerrain() is faster for terrain.'],
+        pitfalls: [
+            L('Always returns an array. LOOK_TERRAIN gives ["plain"], ["swamp"] or ["wall"]; Room.getTerrain() is faster for terrain.',
+                eng(ROOMS, 'return [result];'),
+                eng(ROOMS, 'return _.clone(typeResult);'),
+                doc('Room.getTerrain')),
+        ],
         see: ['RoomPosition.lookFor', 'Room.lookForAtArea', 'Room.getTerrain', 'const:look'],
     },
     'Room.lookAtArea': {
@@ -40,21 +61,43 @@ module.exports = {
     'Room.lookForAtArea': {
         summary: 'Objects of one kind inside a rectangle. Arguments are top, left, bottom, right, then asArray.',
         tasks: ['find structures around a position', 'count free tiles around a source', 'scan terrain around a point'],
-        pitfalls: ['The order is (type, top, left, bottom, right): y before x. Pass true as the last argument to get a flat array.'],
+        pitfalls: [
+            L('The order is (type, top, left, bottom, right): y before x. Pass true as the last argument to get a flat array.',
+                eng(ROOMS, 'Room.prototype.lookForAtArea = register.wrapFn(function(type, top, left, bottom, right, asArray) {'),
+                doc('Room.lookForAtArea')),
+        ],
         see: ['RoomPosition.findInRange', 'Room.lookForAt'],
     },
     'Room.createConstructionSite': {
         summary: 'Place a construction site. Works in your rooms, in neutral rooms and in rooms you reserved.',
         tasks: ['place a construction site', 'plan a structure', 'build a road in a remote room', 'build a container in a room I do not own', 'can I build in another player\'s room', 'place a spawn'],
         pitfalls: [
-            'ERR_NOT_OWNER in a room owned or reserved by another player.',
-            'ERR_RCL_NOT_ENOUGH counts existing structures and sites of that type against the room level. Without your controller only roads and {{CONTROLLER_STRUCTURES.container[0]}} containers are allowed.',
-            'ERR_FULL at {{MAX_CONSTRUCTION_SITES}} sites per player, counted over all rooms.',
-            'ERR_INVALID_TARGET: border tiles, a tile that already has a site, a second structure on the tile (only roads and ramparts share), walls (except roads and extractors), and any tile next to an exit unless it is a road or container.',
-            'The site exists from the next tick; its id is not available in the tick you place it.',
-            'An enemy creep that steps on a site removes it.',
+            L('ERR_NOT_OWNER in a room owned or reserved by another player.',
+                eng(ROOMS, 'if(this.controller && this.controller.level > 0 && !this.controller.my) {'),
+                eng(ROOMS, '(register.objectsByRoom[this.name][this.controller.id].reservation.user != runtimeData.user._id)) {')),
+            L('ERR_RCL_NOT_ENOUGH counts existing structures and sites of that type against the room level. Without your controller only roads and {{CONTROLLER_STRUCTURES.container[0]}} containers are allowed.',
+                eng(UTILS, "var structuresCnt = _(roomObjects).filter((i) => i.type == type || i.type == 'constructionSite' && i.structureType == type).size();"),
+                eng(UTILS, 'var availableCnt = C.CONTROLLER_STRUCTURES[type][rcl] + offset;'),
+                common(CONST, '"container": {0: 5, 1: 5, 2: 5, 3: 5, 4: 5, 5: 5, 6: 5, 7: 5, 8: 5},')),
+            L('ERR_FULL at {{MAX_CONSTRUCTION_SITES}} sites per player, counted over all rooms.',
+                eng(ROOMS, "if(_(runtimeData.userObjects).filter({type: 'constructionSite'}).size() + createdConstructionSites >= C.MAX_CONSTRUCTION_SITES) {")),
+            L('ERR_INVALID_TARGET: border tiles, a tile that already has a site, a second structure on the tile (only roads and ramparts share), walls (except roads and extractors), and any tile next to an exit unless it is a road or container.',
+                eng(UTILS, 'if(x <= 0 || y <= 0 || x >= 49 || y >= 49) {'),
+                eng(UTILS, "if(_.any(objects, {x, y, type: 'constructionSite'})) {"),
+                eng(UTILS, "_.any(objects, (i) => i.x == x && i.y == y && i.type != 'rampart' && i.type != 'road' && C.CONSTRUCTION_COST[i.type])) {"),
+                eng(UTILS, "if(structureType != 'road' && exports.checkTerrain(objects, x, y, C.TERRAIN_MASK_WALL)) {"),
+                eng(UTILS, "if(structureType != 'road' && structureType != 'container' && (x == 1 || x == 48 || y == 1 || y == 48)) {")),
+            L('The site exists from the next tick; its id is not available in the tick you place it.',
+                eng(ROOMS, "intents.pushByName('room', 'createConstructionSite', intent);"),
+                eng(P + 'room/create-construction-site.js', 'bulk.insert(obj);')),
+            L('An enemy creep that steps on a site removes it.',
+                eng(P + 'movement.js', "var constructionSite = _.find(cellObjects, (i) => i.type == 'constructionSite' && i.user != object.user);")),
         ],
-        notes: ['A road costs {{CONSTRUCTION_COST.road}} on plain, ×{{CONSTRUCTION_COST_ROAD_SWAMP_RATIO}} on swamp and ×{{CONSTRUCTION_COST_ROAD_WALL_RATIO}} through a wall.'],
+        notes: [
+            L('A road costs {{CONSTRUCTION_COST.road}} on plain, ×{{CONSTRUCTION_COST_ROAD_SWAMP_RATIO}} on swamp and ×{{CONSTRUCTION_COST_ROAD_WALL_RATIO}} through a wall.',
+                eng(P + 'room/create-construction-site.js', 'progressTotal *= C.CONSTRUCTION_COST_ROAD_SWAMP_RATIO;'),
+                eng(P + 'room/create-construction-site.js', 'progressTotal *= C.CONSTRUCTION_COST_ROAD_WALL_RATIO;')),
+        ],
         constants: ['MAX_CONSTRUCTION_SITES', 'CONSTRUCTION_COST', 'CONTROLLER_STRUCTURES', 'CONSTRUCTION_COST_ROAD_SWAMP_RATIO', 'CONSTRUCTION_COST_ROAD_WALL_RATIO'],
         see: ['Creep.build', 'ConstructionSite.remove', 'RoomPosition.createConstructionSite', 'mechanic:ownership', 'const:structures'],
         engine: [
@@ -65,14 +108,23 @@ module.exports = {
     'Room.createFlag': {
         summary: 'Place a flag in a visible room.',
         tasks: ['place a flag'],
-        notes: ['For a room without vision use new RoomPosition(x, y, roomName).createFlag(). Limit: {{FLAGS_LIMIT}} flags.'],
+        notes: [
+            L('The room must be visible: RoomPosition.createFlag throws for a room without vision. To get a flag there, place it in a visible room and move it with Flag.setPosition. Limit: {{FLAGS_LIMIT}} flags.',
+                eng(ROOMS, 'return room.createFlag(this, name, color, secondaryColor);'),
+                eng('src/game/flags.js', "intents.pushByName('room', 'createFlag', {roomName, x, y, name: this.name, color: this.color, secondaryColor: this.secondaryColor});"),
+                eng(ROOMS, 'if(_.size(globals.Game.flags) >= C.FLAGS_LIMIT) {')),
+        ],
         constants: ['FLAGS_LIMIT'],
         see: ['RoomPosition.createFlag', 'Flag'],
     },
     'Room.findPath': {
         summary: 'Path between two positions of this room, as steps with x, y, dx, dy, direction.',
         tasks: ['find a path inside a room'],
-        pitfalls: ['By default other creeps count as obstacles; pass ignoreCreeps for a stable path. For anything across rooms or with own costs use PathFinder.search.'],
+        pitfalls: [
+            L('By default other creeps count as obstacles; pass ignoreCreeps for a stable path. For anything across rooms or with own costs use PathFinder.search.',
+                eng(ROOMS, IGNORE_CREEPS),
+                eng(ROOMS, 'if(pos.roomName != id) {')),
+        ],
         see: ['PathFinder.search', 'Creep.moveByPath', 'Room.serializePath'],
     },
     'Room.findExitTo': {
@@ -83,7 +135,11 @@ module.exports = {
     'Room.getEventLog': {
         summary: 'What happened in this room in the previous tick: attacks, heals, builds, harvests, transfers, exits, destroyed objects.',
         tasks: ['who attacked my creep', 'detect damage', 'see what other players did last tick', 'count harvested energy'],
-        pitfalls: ['The log is parsed from JSON on the first call per room and tick; pass true to get the raw string and parse only when needed.'],
+        pitfalls: [
+            L('The log is parsed from JSON on the first call per room and tick; pass true to get the raw string and parse only when needed.',
+                eng(ROOMS, "roomEventLogCache[this.name] = JSON.parse(runtimeData.roomEventLog[this.name] || '[]');"),
+                eng(ROOMS, "return runtimeData.roomEventLog[this.name] || '[]';")),
+        ],
         see: ['const:events'],
     },
     'Room.getTerrain': {
@@ -114,7 +170,11 @@ module.exports = {
     'Room.controller': {
         summary: 'The room\'s controller, or undefined in rooms without one (highways, source keeper centre rooms).',
         tasks: ['get the room controller', 'is this room mine', 'who owns this room'],
-        notes: ['Mine: room.controller && room.controller.my. Reserved by me: controller.reservation && controller.reservation.username === myName.'],
+        notes: [
+            L('Mine: room.controller && room.controller.my. Reserved by me: controller.reservation && controller.reservation.username === myName.',
+                eng(STRUCT, 'my: (o) => _.isUndefined(o.user) ? undefined : o.user == runtimeData.user._id'),
+                eng(STRUCT, 'username: runtimeData.users[o.reservation.user].username,')),
+        ],
         see: ['StructureController', 'mechanic:controller'],
     },
     'Room.storage': { summary: 'The storage in the room, if there is one (also another player\'s in their room).', tasks: ['get the room storage'], see: ['StructureStorage'] },
@@ -128,7 +188,11 @@ module.exports = {
     'RoomPosition.findClosestByPath': {
         summary: 'Nearest object by walking distance. Runs a pathfinding search, so it is expensive.',
         tasks: ['nearest source by path', 'closest reachable target'],
-        pitfalls: ['Returns null when nothing is reachable. Only objects in the same room. Use findClosestByRange when straight distance is good enough.'],
+        pitfalls: [
+            L('Returns null when nothing is reachable. Only objects in the same room. Use findClosestByRange when straight distance is good enough.',
+                eng(ROOMS, 'var result = null;'),
+                eng(ROOMS, 'maxRooms: 1')),
+        ],
         see: ['RoomPosition.findClosestByRange', 'PathFinder.search'],
     },
     'RoomPosition.findClosestByRange': {
@@ -145,7 +209,10 @@ module.exports = {
     'RoomPosition.getRangeTo': {
         summary: 'Distance in tiles, diagonal steps counting 1 (Chebyshev).',
         tasks: ['distance between two positions', 'range to a target'],
-        pitfalls: ['Infinity when the target is in another room.'],
+        pitfalls: [
+            L('Infinity when the target is in another room.',
+                eng(ROOMS, 'if(roomName && roomName != this.roomName) {')),
+        ],
         see: ['RoomPosition.inRangeTo', 'RoomPosition.isNearTo', 'Game.map.getRoomLinearDistance'],
     },
     'RoomPosition.inRangeTo': { summary: 'True when the target is within the given range.', tasks: ['is a target in range'], see: ['RoomPosition.getRangeTo'] },
@@ -155,7 +222,7 @@ module.exports = {
     'RoomPosition.look': { summary: 'Everything on this tile.', tasks: ['what is at this position'], see: ['Room.lookAt'] },
     'RoomPosition.lookFor': { summary: 'Objects of one kind (LOOK_*) on this tile.', tasks: ['structures at a position', 'is there a road here'], see: ['Room.lookForAt', 'const:look'] },
     'RoomPosition.createConstructionSite': { summary: 'Room.createConstructionSite at this position. The room must be visible.', tasks: ['place a site at a position'], see: ['Room.createConstructionSite'] },
-    'RoomPosition.createFlag': { summary: 'Place a flag here; works without vision of the room.', tasks: ['place a flag in an unseen room'], see: ['Room.createFlag'] },
+    'RoomPosition.createFlag': { summary: 'Room.createFlag at this position. The room must be visible; it throws for a room without vision.', tasks: ['place a flag in an unseen room'], see: ['Room.createFlag'] },
 
     // ---------------------------------------------------------------- base objects
     'RoomObject.pos': { summary: 'Position of the object.', tasks: ['where is an object'] },
@@ -171,13 +238,27 @@ module.exports = {
         summary: 'Remove a structure at once. Only in a room whose controller is yours.',
         tasks: ['destroy a structure', 'remove a road', 'who can destroy a road in a claimed room', 'remove a wall or rampart', 'clear old structures after claiming a room', 'destroy another player\'s leftover structures'],
         pitfalls: [
-            'ERR_NOT_OWNER unless room.controller.my. A reservation is not enough: in remote or neutral rooms use Creep.dismantle or attack.',
-            'ERR_BUSY while a hostile creep is in the room. The processor is stricter and skips the intent when any creep of another user is present, allies and invaders included.',
-            'No energy comes back. The structure\'s contents stay behind in a ruin.',
+            L('ERR_NOT_OWNER unless room.controller.my. A reservation is not enough: in remote or neutral rooms use Creep.dismantle or attack.',
+                eng(STRUCT, 'if(!this.room.controller || !this.room.controller.my) {'),
+                eng(P + 'room/destroy-structure.js', 'if(!roomController || roomController.user != userId) return;')),
+            L('ERR_BUSY while a creep or power creep of another user is in the room, allies and invaders included; the processor checks the same again.',
+                eng(STRUCT, 'if(this.room.find(C.FIND_HOSTILE_CREEPS).length > 0 ||'),
+                eng(GAME, '[C.FIND_HOSTILE_CREEPS]: (i) => !i.spawning && !i.my,'),
+                eng(P + 'room/destroy-structure.js', "if(_.any(roomObjects, i => (i.type == 'creep' || i.type == 'powerCreep') && i.user != userId)) return;")),
+            L('No energy comes back. The structure\'s contents stay behind in a ruin.',
+                eng(P + 'structures/_destroy.js', 'ruin.store = object.store || {};')),
         ],
         notes: [
-            'In your room it works on every structure with a build cost, whoever built it: roads, containers, walls, and structures left by a previous owner.',
-            'Other ways a structure disappears: dismantle (any creep with WORK, range 1), attacks, tower fire, nukes, and decay for roads, containers and ramparts.',
+            L('In your room it works on every structure with a build cost, whoever built it: roads, containers, walls, and structures left by a previous owner.',
+                eng(P + 'room/destroy-structure.js', 'if(!object || !C.CONSTRUCTION_COST[object.type]) return;'),
+                eng(P + 'room/destroy-structure.js', 'if(!roomController || roomController.user != userId) return;')),
+            L('Other ways a structure disappears: dismantle (any creep with WORK, range 1), attacks, tower fire, nukes, and decay for roads, containers and ramparts.',
+                eng(P + '_damage.js', "require('./structures/_destroy')(target, scope, attackType);"),
+                eng(P + 'creeps/dismantle.js', "require('../_damage')(object, target, amount, C.EVENT_ATTACK_TYPE_DISMANTLE, scope);"),
+                eng(P + 'nukes/tick.js', "require('../_damage')(object, target, damage, C.EVENT_ATTACK_TYPE_NUKE, scope);"),
+                eng(P + 'roads/tick.js', 'object.hits -= decayAmount;'),
+                eng(P + 'containers/tick.js', 'object.hits -= C.CONTAINER_DECAY;'),
+                eng(P + 'ramparts/tick.js', 'object.hits -= C.RAMPART_DECAY_AMOUNT;')),
         ],
         see: ['Creep.dismantle', 'mechanic:ownership', 'Ruin.store', 'ConstructionSite.remove'],
         engine: [
@@ -188,7 +269,12 @@ module.exports = {
     'Structure.isActive': {
         summary: 'False when the room level no longer allows this structure (after a downgrade, or in a room that is not yours).',
         tasks: ['why does my structure not work', 'structures after a controller downgrade'],
-        pitfalls: ['Medium CPU cost: it counts the structures of that type. When there are too many, the ones closest to the controller stay active. Cache the result.'],
+        pitfalls: [
+            L('Medium CPU cost: it counts the structures of that type. When there are too many, the ones closest to the controller stay active. Cache the result.',
+                doc('Structure.isActive'),
+                eng(UTILS, 'if(compareDist < objectDist) {'),
+                eng(UTILS, 'if(compareObj.type === object.type && compareObj.user === object.user) {')),
+        ],
         constants: ['CONTROLLER_STRUCTURES'],
         see: ['mechanic:controller', 'const:controller'],
         engine: [{ file: 'src/utils.js', find: 'exports.checkStructureAgainstController', label: 'engine: which structures stay active' }],
@@ -203,7 +289,11 @@ module.exports = {
     'ConstructionSite.remove': {
         summary: 'Cancel a construction site.',
         tasks: ['remove a construction site', 'cancel building'],
-        notes: ['Half of the progress is dropped as energy on the tile. The owner of the site and the owner of the room can both remove it.'],
+        notes: [
+            L('Half of the progress is dropped as energy on the tile. The owner of the site and the owner of the room can both remove it.',
+                eng(P + 'room/remove-construction-site.js', "require('../_create-energy')(object.x, object.y, object.room, Math.floor(object.progress/2), 'energy', scope);"),
+                eng(P + 'room/remove-construction-site.js', 'if(object.user != userId && !(roomController && roomController.user == userId)) return;')),
+        ],
         see: ['Room.createConstructionSite', 'Game.constructionSites'],
         engine: [{ file: 'src/processor/intents/room/remove-construction-site.js', find: 'if(object.user != userId && !(roomController && roomController.user == userId)) return;', label: 'engine: who may remove a site' }],
     },
@@ -248,19 +338,36 @@ module.exports = {
     Store: {
         summary: 'Contents of a creep or structure: store[RESOURCE_ENERGY] is the amount (0 when none), plus capacity methods.',
         tasks: ['how much energy is in a structure', 'read the contents of a container'],
-        pitfalls: ['Creeps, containers, storages, terminals and factories have one shared capacity. Spawns, extensions, towers, links, labs, nukers and power spawns have a capacity per resource: there the capacity methods need the resource argument and return null without it.'],
+        pitfalls: [
+            L('Creeps, containers, storages, terminals and factories have one shared capacity. Spawns, extensions, towers, links, labs, nukers and power spawns have a capacity per resource: there the capacity methods need the resource argument and return null without it (except getUsedCapacity on a lab that holds no mineral, which returns the total).',
+                eng(STORE, 'return object.storeCapacityResource ? null : object.storeCapacity || null;'),
+                eng(STORE, 'if(!!object.storeCapacityResource && (utils.capacityForResource(object, resource) === 0)) {'),
+                eng(P + 'creeps/build.js', 'storeCapacityResource: {energy: C.SPAWN_ENERGY_CAPACITY},'),
+                eng(P + 'creeps/build.js', 'storeCapacity: C.STORAGE_CAPACITY,'),
+                eng(P + 'creeps/build.js', 'storeCapacity: C.LAB_ENERGY_CAPACITY + C.LAB_MINERAL_CAPACITY,')),
+        ],
         see: ['Store.getFreeCapacity', 'Store.getUsedCapacity', 'Store.getCapacity'],
     },
     'Store.getFreeCapacity': {
         summary: 'Free space, for one resource or in total.',
         tasks: ['how much more fits', 'is a spawn full', 'is the creep full', 'free space in a tower'],
-        pitfalls: ['On structures with per-resource capacity (spawn, extension, tower, link, lab) call it with the resource: getFreeCapacity(RESOURCE_ENERGY). Without it the result is null, which is falsy like 0.'],
+        pitfalls: [
+            L('On structures with per-resource capacity (spawn, extension, tower, link, lab) call it with the resource: getFreeCapacity(RESOURCE_ENERGY). Without it the result is null, which is falsy like 0.',
+                eng(STORE, 'if(utils.capacityForResource(object, resource) === 0) {'),
+                eng(STORE, 'if(!capacity) {'),
+                eng(UTILS, 'Math.max(0, (object.storeCapacity||0) - _.sum(object.storeCapacityResource));')),
+        ],
         see: ['Store.getUsedCapacity', 'Store.getCapacity', 'Creep.transfer'],
     },
     'Store.getUsedCapacity': {
         summary: 'Amount of one resource, or the total of everything when called without argument.',
         tasks: ['how much is stored', 'total carried by a creep', 'is a creep empty'],
-        pitfalls: ['Without argument on a per-resource store (spawn, lab …) it returns null.'],
+        pitfalls: [
+            L('Without argument on a per-resource store (spawn, tower, link …) it returns null; a lab that holds no mineral returns the total instead.',
+                eng(STORE, 'if(!!object.storeCapacityResource && (utils.capacityForResource(object, resource) === 0)) {'),
+                eng(UTILS, 'Math.max(0, (object.storeCapacity||0) - _.sum(object.storeCapacityResource));'),
+                eng(P + 'creeps/build.js', 'storeCapacity: C.LAB_ENERGY_CAPACITY + C.LAB_MINERAL_CAPACITY,')),
+        ],
         see: ['Store.getFreeCapacity'],
     },
     'Store.getCapacity': {
@@ -274,20 +381,42 @@ module.exports = {
         summary: 'The pathfinder: cheapest path from a position to one or several goals, across rooms, with your own tile costs.',
         tasks: ['find a path across rooms', 'path with custom costs', 'avoid a room', 'flee from enemies', 'path that prefers roads', 'plan a road'],
         pitfalls: [
-            'It knows only terrain. Structures, creeps and roads count only through the CostMatrix your roomCallback returns.',
-            'Check result.incomplete: when maxOps (default 2000) or maxRooms (default 16) runs out you get a partial path.',
-            'The path does not contain the start position.',
-            'To prefer roads set plainCost 2, swampCost 10 and write cost 1 on road tiles.',
-            'Return false from roomCallback to keep the search out of a room.',
-            'A goal with range 0 on a blocked tile (a source, a controller) is unreachable; give range 1.',
+            L('It knows only terrain. Structures, creeps and roads count only through the CostMatrix your roomCallback returns.',
+                doc('PathFinder.CostMatrix'),
+                driver(PF, 'mod.loadTerrain(terrainData);'),
+                driver(PF, 'return ret._bits;')),
+            L('Check result.incomplete: when maxOps (default 2000) or maxRooms (default 16) runs out you get a partial path.',
+                driver(PF, 'let maxOps = Math.max(1, (options.maxOps | 0) || 2000);'),
+                driver(PF, 'let maxRooms = Math.min(64, Math.max(1, (options.maxRooms | 0) || 16));'),
+                driver(PFC, 'Nan::New<v8::Boolean>(min_node_h_cost != 0));')),
+            L('The path does not contain the start position.',
+                driver(PFC, 'while (pos != origin) {')),
+            L('To prefer roads set plainCost 2, swampCost 10 and write cost 1 on road tiles.',
+                doc('PathFinder.search'),
+                eng(ROOMS, 'searchOpts.plainCost = 2;'),
+                eng(ROOMS, 'costs.set(object.x, object.y, 1);')),
+            L('Return false from roomCallback to keep the search out of a room.',
+                driver(PF, 'if (ret === false) {')),
+            L('A goal with range 0 on a blocked tile (a source, a controller) is unreachable; give range 1.',
+                doc('PathFinder.search'),
+                eng(ROOMS, 'var ret = globals.PathFinder.search(fromPos, {range: Math.max(1,opts.range || 0), pos: toPos}, searchOpts);')),
         ],
-        notes: ['CostMatrix values: 0 = terrain default, 1–254 = cost, 255 = blocked. 1000 ops cost about 1 CPU.'],
+        notes: [
+            L('CostMatrix values: 0 = terrain default, 1–254 = cost, 255 = blocked. 1000 ops cost about 1 CPU.',
+                driver(PFC, 'if (tmp != 0) {'),
+                driver(PFC, 'if (tmp == 0xff) {'),
+                doc('PathFinder.search')),
+        ],
         see: ['PathFinder.CostMatrix', 'Creep.moveByPath', 'Game.map.findRoute', 'Creep.moveTo', 'mechanic:movement'],
     },
     'PathFinder.CostMatrix': {
         summary: 'Per-tile costs for one room, passed to PathFinder.search through roomCallback.',
         tasks: ['mark tiles as blocked for pathfinding', 'make roads cheaper for pathfinding'],
-        notes: ['Build it once per room and keep it (global or serialized): creating it every tick is the usual CPU waste.'],
+        notes: [
+            L('Build it once per room and keep it (global or serialized): creating it every tick is the usual CPU waste.',
+                doc('PathFinder.search'),
+                doc('PathFinder.CostMatrix.serialize')),
+        ],
         see: ['PathFinder.search', 'PathFinder.CostMatrix.set', 'PathFinder.CostMatrix.serialize'],
     },
     'PathFinder.CostMatrix.set': { summary: 'Set the cost of a tile: 0 terrain default, 255 blocked.', tasks: ['block a tile for pathfinding'], see: ['PathFinder.search'] },
@@ -297,8 +426,16 @@ module.exports = {
     RoomVisual: {
         summary: 'Debug drawings in a room: lines, circles, rectangles, polygons, text. They last one tick.',
         tasks: ['draw debug shapes', 'show text in a room', 'visualize a path'],
-        pitfalls: ['At most 500 KB of visuals per room and tick. Drawing costs only the JSON size, no intent CPU, but it is not free in bulk.'],
-        notes: ['new RoomVisual(roomName) draws in a room without vision; new RoomVisual() draws in all rooms.'],
+        pitfalls: [
+            L('At most 500 KB of visuals per room and tick. Drawing costs only the JSON size, no intent CPU, but it is not free in bulk.',
+                eng('src/game/console.js', 'const sizeLimit = roomName == "map" ? 1000 : 500;'),
+                eng('src/game/console.js', 'const dataString = _.isString(data) ? data : JSON.stringify(data)+"\\n";'),
+                doc('RoomVisual')),
+        ],
+        notes: [
+            L('new RoomVisual(roomName) draws in a room without vision; new RoomVisual() draws in all rooms.',
+                doc('RoomVisual.constructor')),
+        ],
         see: ['RoomVisual.text', 'RoomVisual.poly', 'Game.map.visual'],
     },
     'RoomVisual.text': { summary: 'Draw text at a position.', tasks: ['label an object in the room view'], see: ['RoomVisual', 'Creep.say'] },
