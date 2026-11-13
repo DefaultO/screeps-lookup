@@ -364,7 +364,7 @@ module.exports = {
         range: 3, part: 'HEAL',
         tasks: ['heal at range', 'heal a creep that is not adjacent'],
         pitfalls: [
-            L('Dropped if the creep also calls heal in the same tick. Blocks rangedAttack, rangedMassAttack, build, repair, attack and harvest.',
+            L('Dropped if the creep also calls heal in the same tick. Blocks rangedAttack, rangedMassAttack, attackController, dismantle, repair, build, attack and harvest.',
                 eng(PRIO, "rangedHeal: ['heal'],"),
                 eng(PRIO, "rangedAttack: ['rangedMassAttack','build','repair','rangedHeal']"),
                 eng(PRIO, "harvest: ['attack','build','repair','dismantle','attackController','rangedHeal','heal'],")),
