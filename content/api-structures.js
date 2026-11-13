@@ -573,7 +573,7 @@ module.exports = {
     StructureKeeperLair: {
         summary: 'Keeps one Source Keeper next to a source or mineral in the middle rooms of a sector. When its keeper is hurt or gone it counts {{ENERGY_REGEN_TIME}} ticks and then puts a fresh one in its place.',
         tasks: ['when does a source keeper respawn'],
-        notes: [L('The timer starts as soon as the keeper is missing or below full hits, not when it dies. A keeper still alive when the timer ends is replaced.',
+        notes: [L('The respawn timer of the source keeper starts as soon as it is missing or below full hits, not when it dies. A keeper still alive when the timer ends is replaced.',
             eng('src/processor/intents/keeper-lairs/tick.js', 'if(!keeper || keeper.hits < 5000) {'), eng('src/processor/intents/keeper-lairs/tick.js', 'bulk.remove(keeper._id);'))],
         constants: ['ENERGY_REGEN_TIME'],
         see: ['StructureKeeperLair.ticksToSpawn'],
