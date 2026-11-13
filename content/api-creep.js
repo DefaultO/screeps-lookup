@@ -726,6 +726,11 @@ module.exports = {
     },
     'PowerCreep.create': {
         summary: 'Create a new power creep on the account. It costs one free GPL level and does not appear in a room until spawn() is called.',
+        cpu: 'intent',
+        notes: [
+            L('The reference marks this call as cheap, but it queues an account intent and the runtime charges the 0.2 CPU fee for it.',
+                eng('src/game/power-creeps.js', "intents.pushByName('global', 'createPowerCreep'"), driver('lib/runtime/runtime.js', 'pushByName(id, name, data, maxLen) {')),
+        ],
         tasks: ['create a power creep'],
         see: ['PowerCreep.spawn', 'Game.gpl', 'recipe:power'],
     },
@@ -748,8 +753,11 @@ module.exports = {
         see: ['PowerCreep.spawn', 'recipe:power'],
     },
     'PowerCreep.enableRoom': {
-        summary: 'Switch on power usage in a room at its controller. Range 1. Needed once per room before any power works there.',
+        summary: 'Switch on power usage in a room at its controller. Range 1. Needed once per room that has a controller, before any power works there.',
         range: 1,
+        notes: [
+            L('A room without a controller needs no enabling: powers work there at once.', eng('src/processor/intents/power-creeps/usePower.js', 'if(roomController) {')),
+        ],
         tasks: ['enable powers in a room'],
         see: ['StructureController.isPowerEnabled', 'PowerCreep.usePower'],
     },

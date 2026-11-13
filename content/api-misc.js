@@ -1,5 +1,6 @@
 'use strict';
 // Own text for the remaining objects and for members that mirror another entry.
+const { L, eng, driver } = require('./_h');
 const same = (id, extra) => ({ summary: `Same as ${id} for a power creep.${extra ? ' ' + extra : ''}`, see: [id] });
 
 module.exports = {
@@ -36,5 +37,13 @@ module.exports = {
     'PowerCreep.suicide': same('Creep.suicide', 'The power creep can be spawned again after the cooldown.'),
     'PowerCreep.cancelOrder': same('Creep.cancelOrder'),
     'PowerCreep.notifyWhenAttacked': same('Creep.notifyWhenAttacked'),
-    'PowerCreep.rename': { summary: 'Rename a power creep that is not spawned in the world.', tasks: ['rename a power creep'] },
+    'PowerCreep.rename': {
+        summary: 'Rename a power creep that is not spawned in the world.',
+        cpu: 'intent',
+        tasks: ['rename a power creep'],
+        notes: [
+            L('The reference marks this call as free, but it queues an account intent and the runtime charges the 0.2 CPU fee for it.',
+                eng('src/game/power-creeps.js', "intents.pushByName('global', 'renamePowerCreep'"), driver('lib/runtime/runtime.js', 'pushByName(id, name, data, maxLen) {')),
+        ],
+    },
 };

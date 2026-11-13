@@ -237,7 +237,8 @@ function parseApiFile(file, constants) {
             if (cls === undefined) { cls = sig; sig = ''; }
             if (cls === undefined) cls = '0';
             optsJson = a[3];
-            const isStatic = STATIC_ROOTS.test(id);
+            // a member the reference names with its class (PowerCreep.create) is called on the class
+            const isStatic = STATIC_ROOTS.test(id) || name.startsWith(object + '.');
             const callee = short === 'constructor' ? 'new ' + object : (isStatic ? id : instanceName(entry.object) + '.' + short);
             entry.signature = String(sig).split('|').map(s => `${callee}(${s.trim()})`).join('  |  ');
             Object.assign(entry, CPU_CLASS[cls] || {});
@@ -489,6 +490,12 @@ function applyContent(entries, constants, meta) {
             addCommon(e, o, where);
             if (o.range !== undefined) e.range = o.range;
             if (o.part) e.part = o.part;
+            // the reference marks a few calls as cheap although the runtime charges the intent fee
+            if (o.cpu) {
+                if (o.cpu !== 'intent') die(`${where}: cpu can only be set to 'intent'`);
+                e.cpu = 'intent';
+                e.cpuText = CPU_CLASS.A.cpuText;
+            }
         }
     }
 

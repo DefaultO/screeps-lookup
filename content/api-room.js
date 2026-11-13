@@ -227,7 +227,8 @@ module.exports = {
     // ---------------------------------------------------------------- base objects
     'RoomObject.pos': { summary: 'Position of the object.', tasks: ['where is an object'] },
     'RoomObject.room': { summary: 'Room of the object; undefined for flags and sites in rooms you cannot see.', tasks: ['room of an object'] },
-    'RoomObject.effects': { summary: 'Active power and natural effects: {effect, level, ticksRemaining}.', tasks: ['is a structure under a power effect', 'invulnerability effect'], see: ['const:power'] },
+    'RoomObject.effects': { summary: 'Active effects on the object, each {power, effect, level, ticksRemaining}. The property is undefined on an object that never had an effect.',
+        notes: [L('Only effects with ticks left are listed.', eng('src/game/rooms.js', 'filter(i => i.ticksRemaining > 0)'))], tasks: ['is a structure under a power effect', 'invulnerability effect'], see: ['const:power'] },
 
     Structure: {
         summary: 'Base of every structure: hits, hitsMax, id, structureType, destroy(), isActive(), notifyWhenAttacked().',
@@ -332,7 +333,7 @@ module.exports = {
         engine: [{ file: 'src/processor/intents/structures/_destroy.js', find: 'ruin.store = object.store || {};', label: 'engine: ruin keeps the store' }],
     },
     'Ruin.store': { summary: 'Resources in the ruin; take them with withdraw.', tasks: ['loot a ruin'], see: ['Creep.withdraw'] },
-    Flag: { summary: 'A named marker you can place in any room, with its own memory. Useful to steer code by hand.', tasks: ['mark a position by hand'], constants: ['FLAGS_LIMIT'], see: ['Room.createFlag', 'Game.flags'] },
+    Flag: { summary: 'A named marker with its own memory. It is placed in a room you can see and can then be moved to any room. Useful to steer code by hand.', tasks: ['mark a position by hand'], constants: ['FLAGS_LIMIT'], see: ['Room.createFlag', 'Game.flags'] },
 
     // ---------------------------------------------------------------- Store
     Store: {
