@@ -239,7 +239,8 @@ function parseApiFile(file, constants) {
             if (cls === undefined) { cls = sig; sig = ''; }
             if (cls === undefined) cls = '0';
             optsJson = a[3];
-            const isStatic = STATIC_ROOTS.test(id) || STATIC_MEMBERS.has(id);
+            // PathFinder is a namespace, but a CostMatrix is an object with its own methods
+            const isStatic = (STATIC_ROOTS.test(id) && !/^PathFinder.CostMatrix./.test(id)) || STATIC_MEMBERS.has(id);
             const callee = short === 'constructor' ? 'new ' + object : (isStatic ? id : instanceName(entry.object) + '.' + short);
             entry.signature = String(sig).split('|').map(s => `${callee}(${s.trim()})`).join('  |  ');
             Object.assign(entry, CPU_CLASS[cls] || {});
