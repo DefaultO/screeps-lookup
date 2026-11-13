@@ -1,0 +1,15 @@
+{
+  "name": "screeps-lookup",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Screeps API lookup by task: a generated index, a command for agents and a static site.",
+  "bin": { "screeps-api": "tools/api.js" },
+  "scripts": {
+    "fetch": "node tools/fetch-sources.js",
+    "build": "node tools/build.js",
+    "test": "node tools/test.js",
+    "serve": "node tools/serve.js",
+    "api": "node tools/api.js"
+  },
+  "engines": { "node": ">=18" }
+}

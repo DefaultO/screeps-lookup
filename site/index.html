@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Screeps lookup</title>
+<meta name="description" content="Find the Screeps API call for a task: signature, cost, return codes, pitfalls.">
+<style>
+/* Layout: a browse rail on the left, one reading column on the right. The search bar turns the column
+   into ranked answers; the first answer is the only raised panel, everything else is ruled rows. */
+:root {
+  color-scheme: light;
+  --paper: #f4f6f9;  --surface: #ffffff;
+  --ink: #141a24;    --ink-2: #47526a;  --ink-3: #66718a;
+  --rule: #dce1ea;   --rule-2: #e9edf3; --code: #edf0f5;
+  --accent: #2250d8; --accent-wash: #e5ebfc;
+  --mark: #fff0a8;                               /* marker pen over the words that matched */
+  --cost: #8f4b00;   --cost-wash: #fdecd0;       /* the 0.2 CPU intent fee */
+  --pit: #b3331b;    --good: #17794a;  --bad: #b3331b;
+  --s1: #2a78d6;     --s2: #eb6834;    --s3: #1baf7a;   /* chart series, fixed order */
+  --sans: Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --rail: 276px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #10141b;  --surface: #171b23;
+    --ink: #e8ebf1;    --ink-2: #b3bbc9;  --ink-3: #8993a6;
+    --rule: #2b3242;   --rule-2: #222835; --code: #212734;
+    --accent: #8aabff; --accent-wash: #1d2a4d;
+    --mark: #6a5300;
+    --cost: #f2b65c;   --cost-wash: #3b2c10;
+    --pit: #ff9079;    --good: #62d09a;   --bad: #ff9079;
+    --s1: #3987e5;     --s2: #d95926;     --s3: #199e70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10141b;  --surface: #171b23;
+  --ink: #e8ebf1;    --ink-2: #b3bbc9;  --ink-3: #8993a6;
+  --rule: #2b3242;   --rule-2: #222835; --code: #212734;
+  --accent: #8aabff; --accent-wash: #1d2a4d;
+  --mark: #6a5300;
+  --cost: #f2b65c;   --cost-wash: #3b2c10;
+  --pit: #ff9079;    --good: #62d09a;   --bad: #ff9079;
+  --s1: #3987e5;     --s2: #d95926;     --s3: #199e70;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--mono); font-size: 0.9em; }
+code { background: var(--code); padding: 0.08em 0.32em; border-radius: 4px; overflow-wrap: anywhere; }
+mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2 { text-wrap: balance; }
+[hidden] { display: none !important; }
+
+/* ---- shell */
+.app { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100vh; }
+.rail { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; border-right: 1px solid var(--rule); padding: 14px 10px 40px 18px; scrollbar-width: thin; }
+.col { min-width: 0; display: flex; flex-direction: column; }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.bar-in, .page, .foot-in { max-width: 900px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar-in { display: flex; align-items: center; gap: 8px; padding-block: 10px; }
+.page { width: 100%; padding-block: 22px 56px; flex: 1; }
+@media (min-width: 1000px) { .bar-in, .page, .foot-in { padding-left: 32px; padding-right: 32px; } }
+
+.brand { display: flex; align-items: center; gap: 9px; color: var(--ink); font: 600 15px var(--mono); letter-spacing: -0.01em; padding: 4px 0 14px; }
+.brand:hover { text-decoration: none; }
+.brand b { color: var(--accent); font-weight: 600; }
+.brand svg { flex: none; }
+.glyph rect { fill: var(--rule); }
+.glyph .on { fill: var(--accent); }
+
+.rail details { margin: 0 0 2px; }
+.rail summary { list-style: none; display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--ink); user-select: none; }
+.rail summary::-webkit-details-marker { display: none; }
+.rail summary::before { content: ""; width: 0; height: 0; border: 4px solid transparent; border-left-color: var(--ink-3); margin-left: 2px; transition: transform 0.12s; }
+.rail details[open] > summary::before { transform: rotate(90deg) translate(2px, -2px); }
+.rail summary:hover { background: var(--rule-2); }
+.rail summary .n { margin-left: auto; font: 500 11.5px var(--mono); color: var(--ink-3); }
+.rail ul { list-style: none; margin: 0 0 8px; padding: 0 0 0 16px; }
+.rail li a { display: block; padding: 3px 8px; border-radius: 6px; color: var(--ink-2); font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.rail li a.mono { font-size: 12.5px; }
+.rail li a:hover { background: var(--rule-2); color: var(--ink); text-decoration: none; }
+.rail li a[aria-current="page"] { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+.rail-h { margin: 14px 0 4px 6px; font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+.ib { flex: none; display: inline-grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--rule); background: var(--surface); border-radius: 9px; padding: 0; }
+.ib:hover { border-color: var(--ink-3); }
+.ib svg { stroke: var(--ink-2); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#menu { display: none; }
+.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 10px 0 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.search svg { flex: none; stroke: var(--ink-3); fill: none; stroke-width: 1.8; stroke-linecap: round; }
+#q { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 16px var(--sans); padding: 0; }
+#q::placeholder { color: var(--ink-3); }
+#q::-webkit-search-cancel-button { display: none; }
+kbd { font: 500 11.5px var(--mono); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 5px; padding: 1px 6px; background: var(--paper); }
+.search:focus-within kbd { display: none; }
+#clear { border: 0; background: none; color: var(--ink-3); font-size: 20px; line-height: 1; padding: 2px 4px; }
+.scrim { display: none; }
+
+/* ---- shared pieces */
+.eyebrow { font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.pill { display: inline-flex; align-items: center; gap: 4px; font: 600 11.5px/1.6 var(--mono); padding: 0 7px; border-radius: 5px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; vertical-align: 2px; }
+.pill.cost { background: var(--cost-wash); border-color: transparent; color: var(--cost); }
+.pill.dep { color: var(--bad); border-color: currentColor; }
+.sh { font: 600 11.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.sh::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.sec { margin-top: 20px; }
+.lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.lines li { position: relative; padding-left: 16px; }
+.lines li::before { content: ""; position: absolute; left: 2px; top: 0.62em; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); }
+.lines.pit li::before { background: var(--pit); }
+.lines li .tag { font: 600 10.5px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-right: 6px; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 10px; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 0 8px; }
+.steps li::before { content: counter(step); font: 600 12px/22px var(--mono); width: 22px; height: 22px; text-align: center; border: 1px solid var(--rule); border-radius: 50%; color: var(--ink-2); margin-top: 1px; }
+.steps .call { display: block; font: 600 13px var(--mono); }
+.more { margin-top: 8px; }
+.more > summary { cursor: pointer; color: var(--accent); font-size: 13.5px; list-style: none; width: fit-content; }
+.more > summary::-webkit-details-marker { display: none; }
+.more[open] > summary { margin-bottom: 8px; color: var(--ink-3); }
+
+.sig { position: relative; margin-top: 12px; background: var(--code); border-radius: 8px; }
+.sig pre { margin: 0; padding: 10px 46px 10px 12px; font: 13.5px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
+.copy { position: absolute; top: 6px; right: 6px; border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; font: 500 11.5px var(--sans); color: var(--ink-2); padding: 2px 7px; }
+.copy:hover { border-color: var(--ink-3); }
+
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 14px 0 0; padding: 10px 0; border-block: 1px solid var(--rule-2); }
+.facts div { min-width: 0; }
+.facts dt { font: 600 10.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.facts dd { margin: 1px 0 0; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.facts dd b { font: 600 14px var(--mono); }
+.rg rect { fill: var(--rule); }
+.rg .in { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 0.6; }
+.rg .me { fill: var(--accent); }
+
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 5px 16px 5px 0; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+th { font: 600 11px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; border-bottom-color: var(--rule); }
+td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+th.n { text-align: right; }
+td.c { font: 500 12.5px var(--mono); white-space: nowrap; }
+td.zero { color: var(--ink-3); }
+td.up { font-weight: 700; color: var(--ink); }
+.yn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.yn svg { flex: none; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.yn.y svg { stroke: var(--good); }
+.yn.x svg { stroke: var(--bad); }
+.yn.x { color: var(--ink-3); }
+.note { color: var(--ink-3); font-size: 13px; margin-top: 6px; }
+
+.consts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 0 28px; margin: 0; }
+.consts div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 10px; padding: 4px 0; border-bottom: 1px solid var(--rule-2); min-width: 0; }
+.consts dt { font: 12px var(--mono); color: var(--ink-2); overflow-wrap: break-word; min-width: 0; }
+.consts dd { margin: 0 0 0 auto; font: 600 12.5px var(--mono); text-align: right; overflow-wrap: anywhere; }
+.codes { display: flex; flex-wrap: wrap; gap: 5px; }
+.codes span { font: 12px var(--mono); padding: 1px 7px; border-radius: 5px; background: var(--code); color: var(--ink-2); }
+.codes span b { color: var(--ink-3); font-weight: 500; margin-left: 4px; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; }
+.links a.mono { font-size: 12.5px; }
+
+/* ---- start page */
+.hero { padding: 14px 0 6px; }
+.hero h1 { font: 650 30px/1.15 var(--sans); letter-spacing: -0.02em; }
+.hero .lead { margin-top: 8px; color: var(--ink-2); font-size: 16.5px; max-width: 60ch; }
+.tries { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.try { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 3px 12px; font-size: 13.5px; color: var(--ink-2); }
+.try:hover { border-color: var(--accent); color: var(--ink); text-decoration: none; }
+.block { margin-top: 34px; }
+.ledger { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 22px 36px; }
+.lg h3 { font: 600 14px var(--sans); margin-bottom: 4px; }
+.lr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 0 14px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--rule-2); color: var(--ink); }
+.lr:hover { text-decoration: none; background: var(--rule-2); box-shadow: -6px 0 0 var(--rule-2), 6px 0 0 var(--rule-2); }
+.lr .ll { color: var(--ink-2); font-size: 14px; }
+.lr .lv { text-align: right; }
+.lr .lv b { font: 600 14px var(--mono); font-variant-numeric: tabular-nums; }
+.lr .lv span { color: var(--ink-3); font-size: 12.5px; margin-left: 5px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 30px 36px; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows a { display: block; padding: 8px 0; border-top: 1px solid var(--rule-2); color: var(--ink); }
+.rows a:hover { text-decoration: none; background: var(--rule-2); box-shadow: -6px 0 0 var(--rule-2), 6px 0 0 var(--rule-2); }
+.rows .rt { font-weight: 600; }
+.rows .rs { display: block; color: var(--ink-2); font-size: 13.5px; }
+
+/* ---- results */
+.rh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 12px; }
+.rh .count { color: var(--ink-3); font-size: 13.5px; margin-right: auto; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--rule); background: transparent; border-radius: 999px; padding: 2px 11px; color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+.chip b { font: 500 11.5px var(--mono); color: var(--ink-3); margin-left: 4px; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip[aria-pressed="true"] b { color: inherit; opacity: 0.7; }
+.chip:disabled { opacity: 0.45; cursor: default; }
+.answer { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px 20px; }
+.answer.sel, .res.sel > a { box-shadow: 0 0 0 2px var(--accent); }
+.title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-top: 3px; }
+.title h2, .title h1 { font: 650 22px/1.25 var(--sans); letter-spacing: -0.01em; overflow-wrap: anywhere; min-width: 0; }
+.title .mono { font: 600 20px/1.3 var(--mono); letter-spacing: -0.02em; }
+.title a { color: inherit; }
+.lead { margin-top: 10px; font-size: 15.5px; max-width: 72ch; }
+.hit { margin-top: 14px; padding: 12px 14px; border-radius: 9px; background: var(--accent-wash); }
+.hit .sh { color: var(--ink-2); margin-bottom: 6px; }
+.hit .sh::after { display: none; }
+.open { display: inline-block; margin-top: 16px; font-weight: 600; font-size: 14px; }
+.results { list-style: none; margin: 14px 0 0; padding: 0; }
+.res > a { display: block; padding: 12px 10px; margin: 0 -10px; border-top: 1px solid var(--rule); border-radius: 8px; color: var(--ink); }
+.res:first-child > a { border-top-color: transparent; }
+.res > a:hover { background: var(--rule-2); text-decoration: none; }
+.res .title h3 { font: 600 15.5px var(--sans); overflow-wrap: anywhere; min-width: 0; }
+.res .title .mono { font: 600 14.5px var(--mono); }
+.res .rs { display: block; color: var(--ink-2); margin-top: 2px; font-size: 14px; }
+.res .lines { margin-top: 6px; font-size: 13.5px; color: var(--ink-2); gap: 4px; }
+.empty { color: var(--ink-2); padding: 24px 0; }
+
+/* ---- entry page */
+.crumbs { font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.crumbs a { color: var(--ink-2); }
+.entry .title h1 { font-size: 27px; }
+.entry .title .mono { font-size: 24px; }
+.members td:first-child { white-space: nowrap; }
+.members a { font: 600 13px var(--mono); }
+.dep-note { margin-top: 10px; color: var(--bad); }
+
+/* ---- chart */
+.viz { margin-top: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+.chart { position: relative; max-width: 660px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--rule-2); stroke-width: 1; }
+.chart .axis { stroke: var(--rule); stroke-width: 1; }
+.chart text { font: 11.5px var(--sans); fill: var(--ink-3); }
+.chart .end { font: 600 12px var(--sans); fill: var(--ink-2); }
+.chart .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { stroke: var(--surface); stroke-width: 2; }
+.chart .cross { stroke: var(--ink-3); stroke-width: 1; }
+.tip { position: absolute; top: 6px; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); min-width: 118px; }
+.tip h5 { margin: 0 0 3px; font: 600 11px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.tip div { display: flex; align-items: center; gap: 7px; }
+.tip i { width: 12px; border-top: 2px solid; }
+.tip b { font: 600 13px var(--mono); min-width: 30px; text-align: right; }
+.tip span { color: var(--ink-2); }
+.ladder { display: grid; gap: 14px; }
+.ladder h4 { font: 600 14px var(--sans); }
+.ladder p { color: var(--ink-3); font-size: 13px; margin-bottom: 6px; }
+.rungs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rungs li { display: inline-flex; align-items: center; gap: 6px; font: 500 12.5px var(--mono); padding: 2px 9px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.rungs li b { font-weight: 600; color: var(--ink-3); }
+
+footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5px; }
+.foot-in { padding-block: 16px 28px; display: grid; gap: 6px; }
+
+@media (max-width: 899px) {
+  .app { display: block; }
+  #menu { display: inline-grid; }
+  .rail { position: fixed; inset: 0 auto 0 0; width: min(310px, 86vw); height: auto; z-index: 20; background: var(--paper); transform: translateX(-102%); transition: transform 0.18s ease; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
+  .nav-open .rail { transform: none; box-shadow: 0 0 40px rgb(0 0 0 / 0.3); }
+  .nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 15; background: rgb(0 0 0 / 0.4); }
+  kbd { display: none; }
+  .hero h1 { font-size: 25px; }
+  .answer { padding: 14px 14px 16px; }
+  .ledger, .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" id="rail" aria-label="Browse"></aside>
+  <div class="col">
+    <header class="bar"><div class="bar-in">
+      <button class="ib" id="menu" aria-label="Browse the reference" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 5h12M3 9h12M3 13h12"/></svg>
+      </button>
+      <label class="search" for="q">
+        <svg width="17" height="17" viewBox="0 0 17 17"><circle cx="7.2" cy="7.2" r="5"/><path d="M11 11l4 4"/></svg>
+        <input id="q" type="search" placeholder="Describe the task: refill a spawn, reserve a room …" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search by task">
+        <kbd>/</kbd>
+        <button id="clear" type="button" aria-label="Clear the search" hidden>×</button>
+      </label>
+      <button class="ib" id="theme" aria-label="Switch between light and dark">
+        <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6.2"/><path d="M9 2.8v12.4"/><path d="M9 4.4a4.6 4.6 0 0 1 0 9.2z" fill="currentColor" stroke="none"/></svg>
+      </button>
+    </div></header>
+    <main class="page" id="out"></main>
+    <footer><div class="foot-in" id="footer"></div></footer>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<script src="index.js"></script>
+<script>
+/*
+ * Task search over the Screeps API index. No dependencies; runs in Node and in the browser.
+ *
+ *   const engine = ScreepsSearch.create(index);        // index = data/index.json
+ *   engine.search('refill a spawn', {limit: 5});       // -> [{entry, score, task, lines}]
+ *   engine.get('Creep.transfer');                      // -> entry or undefined
+ *   engine.constant('ROAD_DECAY_TIME');                // -> {name, value, group} or undefined
+ *   engine.marker('refill a spawn')(text);             // -> [[start, end], ...] words to highlight
+ *
+ * Ranking: every query word is looked up directly and through its synonym group in the fields
+ * of each entry (name, tasks, summary, body text, constants). A word found in a strong field
+ * counts more; rare words count more; an entry whose single task line covers the whole query
+ * gets a large bonus, because the task lines are written to be matched.
+ *
+ * Each result also carries `lines`: the pitfalls, notes, facts and steps of the entry that
+ * answer this query best, so a caller can show those first instead of the whole entry.
+ */
+(function (root, factory) {
+    if (typeof module === 'object' && module.exports) module.exports = factory();
+    else root.ScreepsSearch = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
+
+    var FIELD_WEIGHT = { name: 5, tasks: 4, summary: 2.5, consts: 1.5, text: 1, meta: 0.5 };
+    var CONCEPT_MATCH = 0.7;
+    var KIND_FACTOR = { recipe: 1.0, mechanic: 1.0, method: 1.0, property: 0.95, object: 1.0, constants: 0.95, article: 0.45 };
+    var PREFIX = /^(mechanic|recipe|const|article):/;
+
+    function undouble(w) {
+        var n = w.length;
+        if (n > 3 && w[n - 1] === w[n - 2] && 'lsfz'.indexOf(w[n - 1]) === -1 && 'aeiou'.indexOf(w[n - 1]) === -1) return w.slice(0, -1);
+        return w;
+    }
+    function stem(w) {
+        if (/^\d+$/.test(w)) return w;
+        if (w.length > 4 && /ies$/.test(w)) w = w.slice(0, -3) + 'y';
+        else if (w.length > 3 && /s$/.test(w) && !/(ss|us|is)$/.test(w)) w = w.slice(0, -1);
+        if (w.length > 7 && /ation$/.test(w)) w = w.slice(0, -5);
+        else if (w.length > 5 && /ing$/.test(w)) w = undouble(w.slice(0, -3));
+        else if (w.length > 4 && /ed$/.test(w)) w = undouble(w.slice(0, -2));
+        if (w.length > 3 && /e$/.test(w)) w = w.slice(0, -1);
+        return w;
+    }
+
+    function create(index) {
+        var syn = index.synonyms || {};
+        var stop = {};
+        (syn.stop || []).forEach(function (w) { stop[w] = true; });
+        var phrases = (syn.phrases || []).map(function (p) { return [new RegExp(p[0], 'g'), p[1]]; });
+        var wordConcepts = {};
+        Object.keys(syn.groups || {}).forEach(function (concept) {
+            syn.groups[concept].forEach(function (w) {
+                var s = stem(w.toLowerCase());
+                (wordConcepts[s] = wordConcepts[s] || []).push('~' + concept);
+            });
+        });
+
+        // the stems one written word stands for: "Creep.transfer" -> creep, transfer, creeptransfer
+        function wordStems(raw) {
+            raw = raw.replace(/['.]+$/, '').replace(/'s$/, '');
+            if (!(/[a-z0-9][A-Z]/.test(raw) || /[_.]/.test(raw))) {
+                var w = raw.toLowerCase().replace(/'/g, '');
+                return stop[w] ? [] : [stem(w)];
+            }
+            var parts = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_.]+/).filter(Boolean).map(function (x) { return x.toLowerCase(); });
+            var out = [parts.join('')];
+            for (var k = 0; k < parts.length; k++) {
+                if (!stop[parts[k]]) out.push(stem(parts[k]));
+                if (k + 1 < parts.length) out.push(parts[k] + parts[k + 1]);
+            }
+            return out;
+        }
+
+        // text -> {tokens: {token: true}, concepts: {concept: true}, count}
+        function analyse(text) {
+            var out = { tokens: {}, concepts: {}, count: 0 };
+            if (!text) return out;
+            text = String(text);
+            var add = function (s) {
+                if (!out.tokens[s]) { out.tokens[s] = true; out.count++; }
+                var cs = wordConcepts[s];
+                if (cs) for (var i = 0; i < cs.length; i++) out.concepts[cs[i]] = true;
+            };
+            var lower = text.toLowerCase();
+            for (var p = 0; p < phrases.length; p++) {
+                phrases[p][0].lastIndex = 0;
+                if (phrases[p][0].test(lower)) phrases[p][1].split(' ').forEach(function (w) { if (!stop[w]) add(stem(w)); });
+            }
+            var words = text.match(/[A-Za-z][A-Za-z0-9_.']*|\d+/g) || [];
+            for (var i = 0; i < words.length; i++) wordStems(words[i]).forEach(add);
+            return out;
+        }
+
+        // All words of a text, stop words included: used to prefer the task line that reads like the query.
+        function rawWords(text) {
+            var set = {}, n = 0;
+            (String(text).toLowerCase().match(/[a-z0-9_.]+/g) || []).forEach(function (w) { if (!set[w]) { set[w] = true; n++; } });
+            return { set: set, n: n };
+        }
+        function overlap(a, b) {
+            var both = 0;
+            for (var w in a.set) if (b.set[w]) both++;
+            return both / Math.max(1, a.n + b.n - both);
+        }
+        function join(list, pick) { return (list || []).map(pick).join(' \n '); }
+
+        var entries = index.entries;
+        var byId = {};
+        var constGroup = {};
+        var docs = entries.map(function (e) {
+            byId[e.id.toLowerCase()] = e;
+            var consts = (e.constants || []).map(function (c) { return c.name; });
+            if (e.kind === 'constants') consts.forEach(function (n) { constGroup[n] = e; });
+            var tables = join(e.tables, function (t) { return t.title + ' ' + t.rows.map(function (r) { return r.join(' '); }).join(' '); });
+            var plainId = e.id.replace(PREFIX, '');
+            return {
+                entry: e,
+                fields: {
+                    name: analyse(plainId + ' ' + (e.title || '') + ' ' + (e.name || '')),
+                    tasks: analyse((e.tasks || []).join(' \n ')),
+                    summary: analyse(e.summary || e.doc || ''),
+                    consts: analyse(consts.join(' ')),
+                    text: analyse([join(e.pitfalls, String), join(e.notes, String), join(e.facts, String), join(e.steps, function (s) { return (s.call || '') + ' ' + s.text; }), e.summary ? e.doc || '' : '', tables].join(' \n ')),
+                    meta: analyse([e.signature || '', join(e.args, function (a) { return a.name + ' ' + (a.desc || '') + ' ' + join(a.options, function (o) { return o.name; }); }),
+                        join(e.returns, function (r) { return r.code; }), e.returnsText || '', e.object || '', e.type || ''].join(' ')),
+                },
+                // the name counts as one more task line, slightly weaker than a written one
+                tasks: (e.tasks || []).map(function (t) { return { text: t, a: analyse(t), words: rawWords(t), w: 1 }; })
+                    .concat([{ text: null, a: analyse(plainId.replace(/\./g, ' ') + ' ' + (e.title || '')), words: rawWords((e.title || e.id).replace(/\./g, ' ')), w: 0.85 }]),
+                constNames: consts,
+                lines: null,
+            };
+        });
+
+        // the lines of an entry a reader acts on, analysed on first use
+        function linesOf(doc) {
+            if (doc.lines) return doc.lines;
+            var e = doc.entry, out = [];
+            var push = function (kind, list, text) {
+                (list || []).forEach(function (x, i) { var t = text ? text(x) : x; out.push({ kind: kind, index: i, text: t, a: analyse(t) }); });
+            };
+            push('pitfall', e.pitfalls);
+            push('note', e.notes);
+            push('fact', e.facts);   // steps are a sequence and are always shown whole
+            doc.lines = out;
+            return out;
+        }
+
+        function matchIn(a, q) {
+            if (a.tokens[q.token]) return 1;
+            for (var i = 0; i < q.concepts.length; i++) if (a.concepts[q.concepts[i]]) return CONCEPT_MATCH;
+            return 0;
+        }
+
+        function queryTokens(query) {
+            var qa = analyse(query);
+            return Object.keys(qa.tokens).map(function (t) { return { token: t, concepts: wordConcepts[t] || [] }; });
+        }
+
+        function search(query, opts) {
+            opts = opts || {};
+            var limit = opts.limit || 8;
+            var qTokens = queryTokens(query);
+            var norm = String(query).trim().toLowerCase();
+            var qWords = rawWords(query);
+            var exactConst = (String(query).match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[A-Z]{2,}\b/g) || []).filter(function (n) { return index.constants && n in index.constants; });
+            if (!qTokens.length) return [];
+
+            // per-token best field weight for every doc, and document frequency
+            var per = docs.map(function () { return new Array(qTokens.length); });
+            var idf = qTokens.map(function (q, qi) {
+                var df = 0;
+                for (var d = 0; d < docs.length; d++) {
+                    var best = 0, f = docs[d].fields;
+                    for (var name in f) {
+                        var m = matchIn(f[name], q);
+                        if (m && m * FIELD_WEIGHT[name] > best) best = m * FIELD_WEIGHT[name];
+                    }
+                    per[d][qi] = best;
+                    if (best) df++;
+                }
+                return Math.log(1 + docs.length / (1 + df));
+            });
+            var total = idf.reduce(function (a, b) { return a + b; }, 0) || 1;
+
+            var results = [];
+            for (var d = 0; d < docs.length; d++) {
+                var doc = docs[d], e = doc.entry;
+                if (opts.kinds && opts.kinds.indexOf(e.kind) === -1) continue;
+                var base = 0, covered = 0;
+                for (var qi = 0; qi < qTokens.length; qi++) {
+                    if (per[d][qi]) { base += idf[qi] * per[d][qi]; covered += idf[qi]; }
+                }
+                var bonus = 0;
+                var idl = e.id.toLowerCase(), namel = (e.name || '').toLowerCase();
+                if (norm === idl || norm === idl.replace(PREFIX, '')) bonus += 1000;
+                else if (norm === namel || norm === (e.title || '').toLowerCase()) bonus += 500;
+                for (var c = 0; c < exactConst.length; c++) {
+                    if (doc.constNames.indexOf(exactConst[c]) !== -1) bonus += e.kind === 'constants' ? 60 : 25;
+                }
+                if (!base && !bonus) continue;
+                var coverage = covered / total;
+
+                // best single task line
+                var bestTask = null, bestTaskScore = 0;
+                for (var t = 0; t < doc.tasks.length; t++) {
+                    var ta = doc.tasks[t].a, got = 0, hits = 0;
+                    for (var qj = 0; qj < qTokens.length; qj++) {
+                        var m2 = matchIn(ta, qTokens[qj]);
+                        if (m2) { got += idf[qj] * m2; hits++; }
+                    }
+                    if (!hits) continue;
+                    var recall = got / total;
+                    var precision = Math.min(1, hits / Math.max(1, ta.count));
+                    var s = doc.tasks[t].w * recall * recall * (0.45 + 0.3 * precision + 0.25 * overlap(qWords, doc.tasks[t].words));
+                    if (s > bestTaskScore) { bestTaskScore = s; bestTask = doc.tasks[t].text; }
+                }
+
+                var score = base * (0.3 + 0.7 * coverage * coverage) + bestTaskScore * total * 9;
+                score *= KIND_FACTOR[e.kind] || 1;
+                if (e.deprecated) score *= 0.4;
+                if (e.object === 'PowerCreep') score *= 0.85;
+                score += bonus;
+                results.push({ doc: doc, entry: e, score: score, task: bestTaskScore > 0.25 ? bestTask : null });
+            }
+            results.sort(function (a, b) { return b.score - a.score || (a.entry.id < b.entry.id ? -1 : 1); });
+            results = results.slice(0, limit);
+
+            // which lines of each result answer the query
+            // A query word that every line of the entry contains (or none) tells the lines apart
+            // no better than chance, so inside one entry a word weighs more the fewer lines have it.
+            results.forEach(function (r) {
+                var lines = linesOf(r.doc), scored = [];
+                delete r.doc;
+                r.lines = [];
+                if (!lines.length) return;
+                var match = lines.map(function (line) { return qTokens.map(function (q) { return matchIn(line.a, q); }); });
+                var localTotal = 0;
+                var weight = qTokens.map(function (q, qi) {
+                    var n = 0;
+                    for (var l = 0; l < lines.length; l++) if (match[l][qi]) n++;
+                    var w = n ? idf[qi] * (Math.sqrt(1 - n / lines.length) + 0.15) : 0;
+                    localTotal += w;
+                    return w;
+                });
+                if (!localTotal) return;
+                lines.forEach(function (line, l) {
+                    var got = 0;
+                    for (var qi = 0; qi < qTokens.length; qi++) got += weight[qi] * match[l][qi];
+                    var share = got / localTotal;
+                    if (share >= 0.5) scored.push({ kind: line.kind, index: line.index, text: line.text, score: share });
+                });
+                scored.sort(function (a, b) { return b.score - a.score || a.index - b.index; });
+                r.lines = scored.slice(0, 3);
+            });
+            return results;
+        }
+
+        // marker(query)(text) -> [[start, end], ...]: the words of text that match the query, directly or by synonym
+        function marker(query) {
+            var want = {}, wantConcepts = {};
+            queryTokens(query).forEach(function (q) { want[q.token] = true; q.concepts.forEach(function (c) { wantConcepts[c] = true; }); });
+            return function (text) {
+                var ranges = [], re = /[A-Za-z][A-Za-z0-9_.']*|\d+/g, m;
+                text = String(text);
+                while ((m = re.exec(text))) {
+                    var stems = wordStems(m[0]), hit = false;
+                    for (var i = 0; i < stems.length && !hit; i++) {
+                        if (want[stems[i]]) hit = true;
+                        else { var cs = wordConcepts[stems[i]]; if (cs) for (var j = 0; j < cs.length; j++) if (wantConcepts[cs[j]]) { hit = true; break; } }
+                    }
+                    if (hit) ranges.push([m.index, m.index + m[0].replace(/['.]+$/, '').length]);
+                }
+                return ranges;
+            };
+        }
+
+        function get(id) {
+            if (!id) return undefined;
+            var key = String(id).trim().toLowerCase();
+            if (byId[key]) return byId[key];
+            var prefixes = ['mechanic:', 'recipe:', 'const:', 'article:'];
+            for (var i = 0; i < prefixes.length; i++) if (byId[prefixes[i] + key]) return byId[prefixes[i] + key];
+            // unique member name, e.g. "transferEnergy"
+            var found = entries.filter(function (e) { return (e.name || '').toLowerCase() === key; });
+            if (found.length === 1) return found[0];
+            var creep = found.filter(function (e) { return e.object === 'Creep'; });
+            return creep.length === 1 ? creep[0] : undefined;
+        }
+
+        function constant(name) {
+            if (!index.constants || !(name in index.constants)) return undefined;
+            return { name: name, value: index.constants[name], group: constGroup[name] ? constGroup[name].id : undefined };
+        }
+
+        return { search: search, get: get, constant: constant, marker: marker, entries: entries, meta: index.meta, analyse: analyse };
+    }
+
+    return { create: create, stem: stem };
+}));
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var index = window.SCREEPS_API_INDEX;
+  var out = document.getElementById('out');
+  if (!index) { out.innerHTML = '<p class="empty">index.js is missing next to this page. Run <code>node tools/build.js</code>.</p>'; return; }
+  var engine = ScreepsSearch.create(index);
+  var C = index.constants;
+  var qEl = document.getElementById('q'), clearEl = document.getElementById('clear'), rail = document.getElementById('rail');
+  var FILTERS = [['', 'All'], ['api', 'API'], ['mechanic', 'Mechanics'], ['recipe', 'Recipes'], ['constants', 'Constants']];
+  var KIND = { method: 'Method', property: 'Property', object: 'Object', mechanic: 'Mechanic', recipe: 'Recipe', constants: 'Constants', article: 'Official article' };
+  var state = { q: '', k: '', e: '' };
+  var sel = 0, shown = [];
+
+  // ---------------------------------------------------------------- helpers
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // text with `code` spans; mk(text) gives the ranges to highlight
+  function rich(s, mk) {
+    s = String(s);
+    var ranges = mk ? mk(s) : [], html = '', pos = 0, inCode = false;
+    function plain(a, b) { html += esc(s.slice(a, b)).replace(/`/g, function () { inCode = !inCode; return inCode ? '<code>' : '</code>'; }); }
+    ranges.forEach(function (r) { if (r[0] < pos) return; plain(pos, r[0]); html += '<mark>'; plain(r[0], r[1]); html += '</mark>'; pos = r[1]; });
+    plain(pos, s.length);
+    return html + (inCode ? '</code>' : '');
+  }
+  function num(n) { if (typeof n !== 'number') return esc(n); var r = Math.round(n * 1000) / 1000; return Math.abs(r) >= 10000 ? r.toLocaleString('en-US') : String(r); }
+  function href(id) { return '#e=' + encodeURIComponent(id); }
+  function isApi(e) { return e.kind === 'method' || e.kind === 'property' || e.kind === 'object'; }
+  function group(e) { return isApi(e) ? 'api' : e.kind; }
+  function label(e) { return e.title || e.id; }
+  function titleHtml(e) { return isApi(e) ? '<span class="mono">' + esc(label(e)) + '</span>' : esc(label(e)); }
+  function eyebrow(e) {
+    var s = KIND[e.kind] || e.kind;
+    if ((e.kind === 'method' || e.kind === 'property') && e.object) s += ' of ' + e.object;
+    return '<p class="eyebrow">' + esc(s) + '</p>';
+  }
+  function pills(e) {
+    var p = '';
+    if (e.kind === 'method' && e.cpu === 'intent') p += '<span class="pill cost" title="An action: costs 0.2 CPU on top of its run time when it returns OK">0.2 CPU</span>';
+    if (e.deprecated) p += '<span class="pill dep">deprecated</span>';
+    return p;
+  }
+  function section(name, html, cls) { return '<section class="sec' + (cls ? ' ' + cls : '') + '"><h3 class="sh">' + esc(name) + '</h3>' + html + '</section>'; }
+  function lineList(items, mk, cls) { return '<ul class="lines' + (cls ? ' ' + cls : '') + '">' + items.map(function (t) { return '<li>' + rich(t, mk) + '</li>'; }).join('') + '</ul>'; }
+  function seeLink(id) { var t = engine.get(id), api = !t || isApi(t); return '<a' + (api ? ' class="mono"' : '') + ' href="' + href(id) + '">' + esc(api ? id : t.title) + '</a>'; }
+
+  // the tiles a creep reaches at this range, on the game's square grid
+  function rangeSvg(r) {
+    var n = 7, cell = 6, gap = 1, size = n * cell + (n - 1) * gap, s = '<svg class="rg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" aria-hidden="true">';
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+      var d = Math.max(Math.abs(x - 3), Math.abs(y - 3));
+      s += '<rect x="' + x * (cell + gap) + '" y="' + y * (cell + gap) + '" width="' + cell + '" height="' + cell + '" rx="1"' + (d === 0 ? ' class="me"' : d <= r ? ' class="in"' : '') + '/>';
+    }
+    return s + '</svg>';
+  }
+  var RANGE_TEXT = { 1: 'the 8 tiles around', 2: 'a 5 × 5 square', 3: 'a 7 × 7 square' };
+
+  function factStrip(e) {
+    var f = [];
+    if (e.kind === 'method') f.push(['CPU', e.cpu === 'intent' ? '<b>+0.2</b> when it returns OK' : 'no intent fee · ' + esc(e.cpu) + ' run time']);
+    if (e.kind === 'property' && e.type) f.push(['Type', '<span class="mono">' + esc(e.type) + '</span>']);
+    if (e.range !== undefined) f.push(['Range', rangeSvg(e.range) + '<span><b>' + esc(e.range) + '</b> ' + (RANGE_TEXT[e.range] ? '· ' + RANGE_TEXT[e.range] : '') + '</span>']);
+    if (e.part) f.push(['Needs', '<b>' + esc(e.part) + '</b> part']);
+    if (e.inherits) f.push(['Inherits', e.inherits.map(function (i) { return '<a class="mono" href="' + href(i) + '">' + esc(i) + '</a>'; }).join(', ')]);
+    if (!f.length) return '';
+    return '<dl class="facts">' + f.map(function (x) { return '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>'; }).join('') + '</dl>';
+  }
+
+  var YES = '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M2.5 7l3 3 5-6.5"/></svg>';
+  var NO = '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3l7 7M10 3l-7 7"/></svg>';
+  function tableHtml(t) {
+    var rows = t.rows.map(function (r, ri) {
+      return '<tr>' + r.map(function (c, i) {
+        if (t.kind === 'matrix' && i > 0) {
+          var m = /^(yes|no)(\*?)$/.exec(String(c));
+          if (m) return '<td><span class="yn ' + (m[1] === 'yes' ? 'y' : 'x') + '">' + (m[1] === 'yes' ? YES : NO) + m[1] + m[2] + '</span></td>';
+        }
+        if (t.kind === 'levels' && i > 0 && typeof c === 'number') {
+          var prev = ri > 0 ? t.rows[ri - 1][i] : 0;
+          return '<td class="n ' + (c === 0 ? 'zero' : c > prev ? 'up' : '') + '">' + (c === 0 ? '·' : num(c)) + '</td>';
+        }
+        return '<td class="' + (i === 0 ? 'c' : typeof c === 'number' ? 'n' : '') + '">' + num(c) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    // a column is numeric when any of its cells is a number; the first column names the row
+    var numeric = t.head.map(function (h, i) { return i > 0 && t.kind !== 'matrix' && t.rows.some(function (r) { return typeof r[i] === 'number'; }); });
+    return section(t.title, '<div class="tw"><table><thead><tr>' + t.head.map(function (h, i) { return '<th' + (numeric[i] ? ' class="n"' : '') + '>' + esc(h) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' + (t.foot ? '<p class="note">' + rich(t.foot) + '</p>' : '') +
+      (t.kind === 'levels' ? '<p class="note">Bold marks the level where the number goes up.</p>' : ''));
+  }
+
+  // ---- tower chart: effect by range, one axis, three series in fixed order
+  var SERIES = [['Attack', 'TOWER_POWER_ATTACK', '--s1'], ['Heal', 'TOWER_POWER_HEAL', '--s2'], ['Repair', 'TOWER_POWER_REPAIR', '--s3']];
+  var CH = { w: 640, h: 292, l: 42, r: 92, t: 12, b: 34, maxX: 25 };
+  function towerAt(base, r) {
+    var a = C.TOWER_OPTIMAL_RANGE, b = C.TOWER_FALLOFF_RANGE, x = Math.min(Math.max(r, a), b);
+    return Math.floor(base - base * C.TOWER_FALLOFF * (x - a) / (b - a));
+  }
+  function towerChart() {
+    var maxY = Math.ceil(Math.max.apply(null, SERIES.map(function (s) { return C[s[1]]; })) / 200) * 200;
+    var px = function (r) { return CH.l + (CH.w - CH.l - CH.r) * r / CH.maxX; };
+    var py = function (v) { return CH.h - CH.b - (CH.h - CH.t - CH.b) * v / maxY; };
+    var s = '<svg viewBox="0 0 ' + CH.w + ' ' + CH.h + '" role="img" tabindex="0" aria-label="Tower attack, heal and repair by range. The same numbers are in the table below.">';
+    for (var v = 0; v <= maxY; v += 200) s += '<line class="' + (v ? 'grid' : 'axis') + '" x1="' + CH.l + '" x2="' + px(CH.maxX) + '" y1="' + py(v) + '" y2="' + py(v) + '"/><text x="' + (CH.l - 8) + '" y="' + (py(v) + 4) + '" text-anchor="end">' + v + '</text>';
+    for (var r = 0; r <= CH.maxX; r += 5) s += '<text x="' + px(r) + '" y="' + (CH.h - CH.b + 16) + '" text-anchor="middle">' + r + '</text>';
+    s += '<text x="' + px(CH.maxX / 2) + '" y="' + (CH.h - 2) + '" text-anchor="middle">range in tiles</text>';
+    SERIES.forEach(function (ser) {
+      var pts = [];
+      for (var r = 0; r <= CH.maxX; r++) pts.push(px(r).toFixed(1) + ',' + py(towerAt(C[ser[1]], r)).toFixed(1));
+      var end = towerAt(C[ser[1]], CH.maxX);
+      s += '<polyline class="ln" style="stroke:var(' + ser[2] + ')" points="' + pts.join(' ') + '"/>' +
+        '<circle class="dot" style="fill:var(' + ser[2] + ')" cx="' + px(CH.maxX) + '" cy="' + py(end) + '" r="4"/>' +
+        '<text class="end" x="' + (px(CH.maxX) + 10) + '" y="' + (py(end) + 4) + '">' + ser[0] + ' ' + end + '</text>';
+    });
+    s += '<g class="hover" hidden><line class="cross" y1="' + CH.t + '" y2="' + (CH.h - CH.b) + '"/>' + SERIES.map(function (ser) { return '<circle class="dot" style="fill:var(' + ser[2] + ')" r="4"/>'; }).join('') + '</g></svg>';
+    return '<div class="viz"><div class="legend">' + SERIES.map(function (ser) { return '<span><i style="border-color:var(' + ser[2] + ')"></i>' + ser[0] + '</span>'; }).join('') +
+      '<span>hits per action, ' + C.TOWER_ENERGY_COST + ' energy each</span></div><div class="chart" data-chart="tower">' + s + '<div class="tip" hidden></div></div></div>';
+  }
+  function wireCharts(rootEl) {
+    Array.prototype.forEach.call(rootEl.querySelectorAll('[data-chart="tower"]'), function (box) {
+      var svg = box.querySelector('svg'), hover = svg.querySelector('.hover'), tip = box.querySelector('.tip'), at = -1;
+      var maxY = Math.ceil(Math.max.apply(null, SERIES.map(function (s) { return C[s[1]]; })) / 200) * 200;
+      function show(r) {
+        r = Math.max(0, Math.min(CH.maxX, r));
+        if (r === at) return;
+        at = r;
+        var x = CH.l + (CH.w - CH.l - CH.r) * r / CH.maxX;
+        hover.removeAttribute('hidden');   // an SVG element has no .hidden property
+        hover.querySelector('line').setAttribute('x1', x); hover.querySelector('line').setAttribute('x2', x);
+        tip.textContent = '';
+        var h = document.createElement('h5'); h.textContent = 'Range ' + r; tip.appendChild(h);
+        SERIES.forEach(function (ser, i) {
+          var v = towerAt(C[ser[1]], r), dot = hover.querySelectorAll('circle')[i];
+          dot.setAttribute('cx', x); dot.setAttribute('cy', CH.h - CH.b - (CH.h - CH.t - CH.b) * v / maxY);
+          var row = document.createElement('div'), key = document.createElement('i'), b = document.createElement('b'), name = document.createElement('span');
+          key.style.borderColor = 'var(' + ser[2] + ')'; b.textContent = v; name.textContent = ser[0];
+          row.appendChild(key); row.appendChild(b); row.appendChild(name); tip.appendChild(row);
+        });
+        tip.hidden = false;
+        var frac = x / CH.w, wpx = box.clientWidth;
+        tip.style.left = frac > 0.55 ? '' : (frac * wpx + 12) + 'px';
+        tip.style.right = frac > 0.55 ? ((1 - frac) * wpx + 12) + 'px' : '';
+      }
+      function hide() { at = -1; hover.setAttribute('hidden', ''); tip.hidden = true; }
+      svg.addEventListener('pointermove', function (ev) {
+        var rect = svg.getBoundingClientRect(), x = (ev.clientX - rect.left) / rect.width * CH.w;
+        show(Math.round((x - CH.l) / (CH.w - CH.l - CH.r) * CH.maxX));
+      });
+      svg.addEventListener('pointerleave', hide);
+      svg.addEventListener('focus', function () { show(at < 0 ? C.TOWER_FALLOFF_RANGE : at); });
+      svg.addEventListener('blur', hide);
+      svg.addEventListener('keydown', function (ev) {
+        if (ev.key === 'ArrowLeft') { show((at < 0 ? 0 : at) - 1); ev.preventDefault(); }
+        if (ev.key === 'ArrowRight') { show((at < 0 ? 0 : at) + 1); ev.preventDefault(); }
+      });
+    });
+  }
+  function ladder(v) {
+    return '<div class="ladder">' + v.groups.map(function (g) {
+      return '<div><h4>' + esc(g.title) + '</h4><p>' + esc(g.note) + '</p><ol class="rungs' + (g.ordered ? ' ord' : '') + '">' +
+        g.items.map(function (it, i) { return '<li>' + (g.ordered ? '<b>' + (i + 1) + '</b>' : '') + esc(it) + '</li>'; }).join('') + '</ol></div>';
+    }).join('') + '</div>';
+  }
+  function vizHtml(e) {
+    if (!e.viz) return '';
+    if (e.viz.type === 'tower') return section('Effect by range', towerChart());
+    if (e.viz.type === 'ladder') return section('Which action wins', ladder(e.viz));
+    return '';
+  }
+
+  // ---------------------------------------------------------------- one entry
+  // opts: full (entry page), mk (highlighter), lines (lines that answer the query)
+  function body(e, opts) {
+    var mk = opts.mk, h = '';
+    if (e.signature && e.kind !== 'object') h += '<div class="sig"><pre>' + esc(e.signature.replace(/  \|  /g, '\n')) + '</pre><button class="copy" type="button" data-copy="' + esc(e.signature.split('  |  ')[0]) + '">Copy</button></div>';
+    var summary = e.summary || e.doc;
+    if (summary) h += '<p class="lead">' + rich(summary, mk) + '</p>';
+    if (e.deprecated && e.deprecated !== true) h += '<p class="dep-note">Deprecated. ' + rich(e.deprecated) + '</p>';
+    h += factStrip(e);
+
+    var picked = {};
+    if (opts.lines && opts.lines.length) {
+      opts.lines.forEach(function (l) { picked[l.kind + l.index] = true; });
+      h += '<div class="hit"><h3 class="sh">For your question</h3><ul class="lines">' + opts.lines.map(function (l) {
+        return '<li>' + (l.kind === 'pitfall' ? '<span class="tag">Watch out</span>' : '') + rich(l.text, mk) + '</li>';
+      }).join('') + '</ul></div>';
+    }
+    // the remaining lines; on a result they fold away when some were picked
+    function rest(kind, list, name, cls, restName) {
+      if (!list || !list.length) return;
+      var items = [];
+      list.forEach(function (x, i) { if (!picked[kind + i]) items.push(x); });
+      if (!items.length) return;
+      var listHtml = lineList(items, mk, cls);
+      var title = items.length < list.length ? restName : name;
+      h += section(title, !opts.full && opts.lines && opts.lines.length && items.length > 2
+        ? lineList(items.slice(0, 2), mk, cls) + '<details class="more"><summary>' + (items.length - 2) + ' more</summary>' + lineList(items.slice(2), mk, cls) + '</details>'
+        : listHtml);
+    }
+    if (e.steps) h += section('Steps', '<ol class="steps">' + e.steps.map(function (s) {
+      return '<li><div>' + (s.call ? '<a class="call" href="' + href(s.call) + '">' + esc(s.call) + '</a>' : '') + rich(s.text, mk) + '</div></li>';
+    }).join('') + '</ol>');
+    rest('fact', e.facts, 'Facts', '', 'Other facts');
+    rest('pitfall', e.pitfalls, 'Watch out', 'pit', 'Also watch out');
+    rest('note', e.notes, 'Good to know', '', 'Also good to know');
+    h += vizHtml(e);
+    if (e.tables) h += e.tables.map(tableHtml).join('');
+
+    if (e.args && opts.full) {
+      h += section('Arguments', '<div class="tw"><table><tbody>' + e.args.map(function (a) {
+        var o = (a.options || []).map(function (x) { return '<div><code>' + esc(x.name) + '</code> <span class="note">' + esc(x.type) + '</span>' + (x.desc ? ' ' + rich(x.desc) : '') + '</div>'; }).join('');
+        return '<tr><td class="c">' + esc(a.name) + (a.optional ? '?' : '') + '</td><td class="c">' + esc(a.type) + '</td><td>' + rich(a.desc || '') + o + '</td></tr>';
+      }).join('') + '</tbody></table></div>');
+    }
+    if (e.returns) {
+      h += opts.full
+        ? section('Return codes', '<div class="tw"><table><tbody>' + e.returns.map(function (r) { return '<tr><td class="c">' + esc(r.code) + '</td><td class="n">' + r.value + '</td><td>' + rich(r.desc || '') + '</td></tr>'; }).join('') + '</tbody></table></div>')
+        : section('Returns', '<div class="codes">' + e.returns.map(function (r) { return '<span title="' + esc(r.desc || '') + '">' + esc(r.code) + '<b>' + r.value + '</b></span>'; }).join('') + '</div>');
+    } else if (e.returnsText) h += section('Returns', '<p>' + rich(e.returnsText) + '</p>');
+
+    if (e.constants) {
+      var cs = e.kind === 'constants' && !opts.full ? e.constants.slice(0, 18) : e.constants;
+      h += section('Constants', '<dl class="consts">' + cs.map(function (c) { return '<div><dt>' + esc(c.name) + '</dt><dd>' + (c.value !== undefined ? esc(c.value) : '…') + '</dd></div>'; }).join('') + '</dl>' +
+        (cs.length < e.constants.length ? '<p class="note"><a href="' + href(e.id) + '">All ' + e.constants.length + ' constants</a></p>' : ''));
+    }
+    if (e.members && opts.full) h += membersHtml(e);
+    if (e.see) h += section('See also', '<div class="links">' + e.see.map(seeLink).join('') + '</div>');
+    var links = [];
+    if (e.url) links.push('<a href="' + esc(e.url) + '" target="_blank" rel="noopener">Official docs ↗</a>');
+    if (opts.full || opts.top) (e.engine || []).forEach(function (g) { links.push('<a href="' + esc(g.url) + '" target="_blank" rel="noopener">' + esc(g.label) + ' ↗</a>'); });
+    if (links.length) h += section('Sources', '<div class="links">' + links.join('') + '</div>');
+    if (e.tasks && opts.full) h += section('Questions this answers', '<div class="links">' + e.tasks.map(function (t) { return '<a href="#q=' + encodeURIComponent(t) + '">' + esc(t) + '</a>'; }).join('') + '</div>');
+    return h;
+  }
+
+  function membersHtml(e) {
+    var ms = e.members.map(function (id) { return engine.get(id); }).filter(Boolean);
+    function tbl(list, name) {
+      if (!list.length) return '';
+      return section(name, '<div class="tw"><table class="members"><tbody>' + list.map(function (m) {
+        return '<tr><td><a href="' + href(m.id) + '">' + esc(m.name) + (m.kind === 'method' ? '()' : '') + '</a></td><td>' + (m.kind === 'method' ? (m.cpu === 'intent' ? '<span class="pill cost">0.2 CPU</span>' : '') : '<span class="note mono">' + esc(m.type || '') + '</span>') +
+          '</td><td>' + rich(m.summary || m.doc || '') + (m.deprecated ? ' <span class="pill dep">deprecated</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>');
+    }
+    return tbl(ms.filter(function (m) { return m.kind === 'method'; }), 'Methods') + tbl(ms.filter(function (m) { return m.kind === 'property'; }), 'Properties');
+  }
+
+  function constHtml(name) {
+    var c = engine.constant(name);
+    if (!c) return '';
+    var v = typeof c.value === 'object' && c.value !== null ? JSON.stringify(c.value, null, 1) : String(c.value);
+    var g = c.group && engine.get(c.group);
+    return '<article class="answer" style="margin-bottom:12px"><p class="eyebrow">Constant</p><div class="title"><h2><span class="mono">' + esc(name) + '</span></h2></div>' +
+      '<div class="sig"><pre>' + esc(v.length > 1500 ? v.slice(0, 1500) + ' …' : v) + '</pre><button class="copy" type="button" data-copy="' + esc(name) + '">Copy</button></div>' +
+      (g ? '<p class="note">In <a href="' + href(g.id) + '">' + esc(g.title) + '</a></p>' : '') + '</article>';
+  }
+
+  // ---------------------------------------------------------------- views
+  function startPage() {
+    var by = function (kind) { return index.entries.filter(function (e) { return e.kind === kind; }); };
+    var tries = ['move energy from one creep to another', 'how fast do containers decay in unowned rooms', 'who can destroy a road', 'what does a boosted HEAL part heal', 'tower damage at range 20', 'which calls cost 0.2 cpu'];
+    var row = function (e) { return '<li><a href="' + href(e.id) + '"><span class="rt">' + esc(e.title) + '</span><span class="rs">' + rich(e.summary) + '</span></a></li>'; };
+    return '<section class="hero"><h1>What do you need to do?</h1><p class="lead">Ask in plain words. You get the call, what it costs, what it returns and what goes wrong.</p>' +
+      '<div class="tries">' + tries.map(function (t) { return '<a class="try" href="#q=' + encodeURIComponent(t) + '">' + esc(t) + '</a>'; }).join('') + '</div></section>' +
+      '<section class="block"><h2 class="sh">Numbers most questions end in</h2><div class="ledger">' + (index.cheats || []).map(function (g) {
+        return '<div class="lg"><h3>' + esc(g.title) + '</h3>' + g.rows.map(function (r) {
+          return '<a class="lr" href="' + href(r.to) + '"><span class="ll">' + esc(r.label) + '</span><span class="lv"><b>' + esc(r.value) + '</b>' + (r.unit ? '<span>' + esc(r.unit) + '</span>' : '') + '</span></a>';
+        }).join('') + '</div>';
+      }).join('') + '</div></section>' +
+      '<section class="block two"><div><h2 class="sh">Recipes</h2><ul class="rows">' + by('recipe').map(row).join('') + '</ul></div>' +
+      '<div><h2 class="sh">Mechanics</h2><ul class="rows">' + by('mechanic').map(row).join('') + '</ul></div></section>';
+  }
+
+  function resultsPage() {
+    var all = engine.search(state.q, { limit: 40 });
+    var mk = engine.marker(state.q);
+    var counts = { '': all.length };
+    all.forEach(function (r) { var g = group(r.entry); counts[g] = (counts[g] || 0) + 1; });
+    if (state.k && !counts[state.k]) state.k = '';
+    var res = (state.k ? all.filter(function (r) { return group(r.entry) === state.k; }) : all).slice(0, 12);
+    shown = res.map(function (r) { return r.entry.id; });
+    var consts = (state.q.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g) || []).map(constHtml).join('');
+    if (!res.length && !consts) {
+      return '<p class="empty">Nothing matches “' + esc(state.q) + '”. Try the verb and the thing (repair road, boost creep), a method name, or a constant such as <code>ROAD_DECAY_TIME</code>.</p>';
+    }
+    var h = '<div class="rh"><p class="count">' + all.length + (all.length === 40 ? '+' : '') + ' entries match</p><div class="chips" role="group" aria-label="Kind">' + FILTERS.map(function (f) {
+      var n = counts[f[0]] || 0;
+      return '<button class="chip" type="button" data-k="' + f[0] + '" aria-pressed="' + (state.k === f[0]) + '"' + (n ? '' : ' disabled') + '>' + f[1] + '<b>' + n + '</b></button>';
+    }).join('') + '</div></div>' + consts;
+    if (res.length) {
+      var top = res[0], e = top.entry;
+      h += '<article class="answer" data-i="0">' + eyebrow(e) + '<div class="title"><h2><a href="' + href(e.id) + '">' + titleHtml(e) + '</a></h2>' + pills(e) + '</div>' +
+        body(e, { mk: mk, lines: top.lines, top: true }) + '<a class="open" href="' + href(e.id) + '">Open the full entry →</a></article>';
+      h += '<ol class="results">' + res.slice(1).map(function (r, i) {
+        var x = r.entry;
+        return '<li class="res" data-i="' + (i + 1) + '"><a href="' + (x.kind === 'article' ? esc(x.url) + '" target="_blank" rel="noopener' : href(x.id)) + '">' + eyebrow(x) +
+          '<div class="title"><h3>' + titleHtml(x) + '</h3>' + pills(x) + '</div><span class="rs">' + rich(x.summary || x.doc || '', mk) + '</span>' +
+          (r.lines.length ? '<ul class="lines">' + r.lines.slice(0, 2).map(function (l) { return '<li>' + rich(l.text, mk) + '</li>'; }).join('') + '</ul>' : '') + '</a></li>';
+      }).join('') + '</ol>';
+    }
+    return h;
+  }
+
+  function entryPage() {
+    var e = engine.get(state.e);
+    if (!e) return '<p class="empty">No entry “' + esc(state.e) + '”. <a href="#">Back to the start</a>.</p>';
+    var crumbs = ['<a href="#">Start</a>'];
+    if (e.kind === 'method' || e.kind === 'property') crumbs.push('<a class="mono" href="' + href(e.object) + '">' + esc(e.object) + '</a>');
+    else crumbs.push(esc({ object: 'API', mechanic: 'Mechanics', recipe: 'Recipes', constants: 'Constants', article: 'Articles' }[e.kind] || e.kind));
+    return '<article class="entry"><nav class="crumbs" aria-label="Breadcrumb">' + crumbs.join('<span>/</span>') + '</nav>' + eyebrow(e) +
+      '<div class="title"><h1>' + titleHtml(e) + '</h1>' + pills(e) + '</div>' + body(e, { full: true }) + '</article>';
+  }
+
+  function render() {
+    document.title = state.e ? label(engine.get(state.e) || { id: state.e }) + ' · Screeps lookup' : state.q ? state.q + ' · Screeps lookup' : 'Screeps lookup';
+    clearEl.hidden = !qEl.value;
+    sel = 0; shown = [];
+    out.innerHTML = state.e ? entryPage() : state.q.trim() ? resultsPage() : startPage();
+    wireCharts(out);
+    markCurrent();
+  }
+
+  // ---------------------------------------------------------------- rail
+  function buildRail() {
+    var by = function (kind) { return index.entries.filter(function (e) { return e.kind === kind; }); };
+    var objs = by('object');
+    var bucket = function (e) {
+      if (/^(Creep|PowerCreep)$/.test(e.id)) return 0;
+      if (/^(Room|RoomPosition|RoomObject|Room\.Terrain|RoomVisual|PathFinder|PathFinder\.CostMatrix|Flag|ConstructionSite|Store)$/.test(e.id)) return 1;
+      if (/^(Structure|OwnedStructure)/.test(e.id)) return 2;
+      if (/^(Game|Memory|RawMemory|InterShardMemory)/.test(e.id)) return 3;
+      return 4;
+    };
+    var groups = [
+      ['recipes', 'Recipes', by('recipe'), false, true],
+      ['mechanics', 'Mechanics', by('mechanic'), false, true],
+      null,
+      ['api-creeps', 'Creeps', objs.filter(function (e) { return bucket(e) === 0; }), true],
+      ['api-rooms', 'Rooms and positions', objs.filter(function (e) { return bucket(e) === 1; }), true],
+      ['api-structures', 'Structures', objs.filter(function (e) { return bucket(e) === 2; }), true],
+      ['api-game', 'Game, CPU, memory', objs.filter(function (e) { return bucket(e) === 3; }), true],
+      ['api-world', 'Things in a room', objs.filter(function (e) { return bucket(e) === 4; }), true],
+      ['constants', 'Constants', by('constants'), false],
+    ];
+    var open = {};
+    try { open = JSON.parse(localStorage.getItem('rail') || '{}'); } catch (x) {}
+    rail.innerHTML = '<a class="brand" href="#" id="home"><svg class="glyph" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">' +
+      [0, 1, 2].map(function (y) { return [0, 1, 2].map(function (x) { return '<rect x="' + x * 7 + '" y="' + y * 7 + '" width="6" height="6" rx="1.2"' + (x === 1 && y === 1 ? ' class="on"' : '') + '/>'; }).join(''); }).join('') +
+      '</svg><span>screeps<b>.lookup</b></span></a><nav>' + groups.map(function (g) {
+        if (!g) return '<div class="rail-h">API</div>';
+        var isOpen = g[0] in open ? open[g[0]] : !!g[4];
+        return '<details data-g="' + g[0] + '"' + (isOpen ? ' open' : '') + '><summary>' + g[1] + '<span class="n">' + g[2].length + '</span></summary><ul>' +
+          g[2].map(function (e) { return '<li><a' + (g[3] ? ' class="mono"' : '') + ' href="' + href(e.id) + '" data-id="' + esc(e.id) + '">' + esc(label(e)) + '</a></li>'; }).join('') + '</ul></details>';
+      }).join('') + '</nav>';
+    rail.addEventListener('toggle', function (ev) {
+      var d = ev.target; if (!d.dataset || !d.dataset.g) return;
+      open[d.dataset.g] = d.open;
+      try { localStorage.setItem('rail', JSON.stringify(open)); } catch (x) {}
+    }, true);
+  }
+  function markCurrent() {
+    var e = state.e && engine.get(state.e), id = e ? (e.kind === 'method' || e.kind === 'property' ? e.object : e.id) : '';
+    Array.prototype.forEach.call(rail.querySelectorAll('a[data-id]'), function (a) {
+      var on = a.getAttribute('data-id') === id;
+      if (on) { a.setAttribute('aria-current', 'page'); var d = a.closest('details'); if (d && !d.open) d.open = true; }
+      else a.removeAttribute('aria-current');
+    });
+  }
+  function nav(openIt) {
+    document.body.classList.toggle('nav-open', openIt);
+    document.getElementById('menu').setAttribute('aria-expanded', String(openIt));
+  }
+
+  // ---------------------------------------------------------------- state and events
+  function readHash() {
+    var h = location.hash.replace(/^#/, ''), s = { q: '', k: '', e: '' };
+    h.split('&').forEach(function (p) { var i = p.indexOf('='); if (i > 0 && s.hasOwnProperty(p.slice(0, i))) { try { s[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1)); } catch (x) {} } });
+    state = s;
+    // typing updates the address with replaceState, so a hashchange always comes from a link or the back button
+    if (qEl.value !== state.q) qEl.value = state.q;
+    nav(false);
+    render();
+    window.scrollTo(0, 0);
+  }
+  function writeHash() {
+    var h = state.q ? '#q=' + encodeURIComponent(state.q) + (state.k ? '&k=' + encodeURIComponent(state.k) : '') : '';
+    history.replaceState(null, '', h || location.pathname + location.search);
+  }
+  function typed() { state.q = qEl.value; state.e = ''; writeHash(); render(); }
+  function select(i) {
+    var items = out.querySelectorAll('[data-i]');
+    if (!items.length) return;
+    sel = Math.max(0, Math.min(items.length - 1, i));
+    Array.prototype.forEach.call(items, function (el, n) { el.classList.toggle('sel', n === sel); });
+    items[sel].scrollIntoView({ block: 'nearest' });
+  }
+
+  var timer;
+  qEl.addEventListener('input', function () { clearTimeout(timer); clearEl.hidden = !qEl.value; timer = setTimeout(typed, 60); });
+  qEl.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { if (shown.length) { ev.preventDefault(); select(sel + (ev.key === 'ArrowDown' ? 1 : -1)); } }
+    else if (ev.key === 'Enter' && shown.length) { clearTimeout(timer); if (state.q !== qEl.value) typed(); if (shown[sel]) location.hash = href(shown[sel]); }
+    else if (ev.key === 'Escape') { qEl.value = ''; typed(); }
+  });
+  clearEl.addEventListener('click', function () { qEl.value = ''; typed(); qEl.focus(); });
+  out.addEventListener('click', function (ev) {
+    var chip = ev.target.closest('.chip');
+    if (chip && !chip.disabled) { state.k = chip.getAttribute('data-k'); writeHash(); render(); return; }
+    var copy = ev.target.closest('[data-copy]');
+    if (copy) {
+      var text = copy.getAttribute('data-copy'), done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { selectText(copy.parentNode.querySelector('pre')); });
+      else selectText(copy.parentNode.querySelector('pre'));
+    }
+  });
+  function selectText(el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  rail.addEventListener('click', function (ev) {
+    var home = ev.target.closest('#home');
+    if (home) { ev.preventDefault(); qEl.value = ''; state = { q: '', k: '', e: '' }; history.pushState(null, '', location.pathname + location.search); nav(false); render(); window.scrollTo(0, 0); }
+    else if (ev.target.closest('a')) nav(false);
+  });
+  document.getElementById('menu').addEventListener('click', function () { nav(!document.body.classList.contains('nav-open')); });
+  document.getElementById('scrim').addEventListener('click', function () { nav(false); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === '/' && document.activeElement !== qEl && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) { ev.preventDefault(); qEl.focus(); qEl.select(); }
+    else if (ev.key === 'Escape') nav(false);
+  });
+  window.addEventListener('hashchange', readHash);
+
+  // theme: follows the system until the button is used
+  var rootEl = document.documentElement;
+  try { var saved = localStorage.getItem('theme'); if (saved === 'dark' || saved === 'light') rootEl.setAttribute('data-theme', saved); } catch (x) {}
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = rootEl.getAttribute('data-theme') ? rootEl.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    var next = dark ? 'light' : 'dark';
+    rootEl.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (x) {}
+  });
+
+  var m = index.meta, src = m.sources;
+  document.getElementById('footer').innerHTML =
+    '<p>' + m.counts.method + ' methods, ' + m.counts.property + ' properties, ' + m.counts.mechanic + ' mechanics, ' + m.counts.recipe + ' recipes, ' + Object.keys(C).length + ' constants. Built from ' +
+    Object.keys(src).map(function (k) { var s = src[k]; return '<a href="' + esc(s.repo) + (s.commit ? '/tree/' + esc(s.commit) : '') + '" target="_blank" rel="noopener">' + esc(k) + (s.version ? ' ' + esc(s.version) : '') + '</a>' + (s.date ? ' (' + esc(s.date) + ')' : ''); }).join(', ') + '.</p>' +
+    '<p>' + esc(m.attribution) + ' <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · <a href="https://docs.screeps.com/api/" target="_blank" rel="noopener">Official API reference</a></p>';
+
+  buildRail();
+  readHash();
+  if (matchMedia('(pointer: fine)').matches && !state.e) qEl.focus();
+}());
+</script>
+</body>
+</html>
