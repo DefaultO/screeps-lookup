@@ -23,7 +23,7 @@ module.exports = {
         ],
         see: ['Game.creeps', 'Game.structures', 'mechanic:memory'],
     },
-    'Game.notify': { summary: 'Send yourself an e-mail. Up to 20 per tick, each cut at 500 characters (the reference says 1000); groupInterval batches them.', tasks: ['send a notification', 'e-mail alert'], see: ['Structure.notifyWhenAttacked'] },
+    'Game.notify': { summary: 'Send yourself an e-mail. Up to 20 per tick; groupInterval batches them. The reference allows 1000 characters per message; the open-source server runtime stores 500.', tasks: ['send a notification', 'e-mail alert'], see: ['Structure.notifyWhenAttacked'] },
     'Game.time': { summary: 'The current tick number.', tasks: ['current tick', 'run code every N ticks'] },
     'Game.creeps': { summary: 'All your creeps by name, including those still spawning.', tasks: ['loop over my creeps', 'find a creep by name', 'count my creeps'], see: ['Creep.memory', 'Game.getObjectById'] },
     'Game.rooms': {
@@ -43,7 +43,7 @@ module.exports = {
     'Game.flags': { summary: 'All your flags by name.', tasks: ['loop over flags'], see: ['Flag'] },
     'Game.gcl': { summary: 'Global Control Level: {level, progress, progressTotal}. The level is the number of rooms you may own.', tasks: ['how many rooms can I claim', 'GCL progress'], constants: ['GCL_MULTIPLY', 'GCL_POW'], see: ['Creep.claimController', 'mechanic:controller'] },
     'Game.gpl': { summary: 'Global Power Level: {level, progress, progressTotal}. Each level is one point to create or upgrade power creeps.', tasks: ['GPL progress', 'how many power levels do I have'], constants: ['POWER_LEVEL_MULTIPLY', 'POWER_LEVEL_POW'], see: ['StructurePowerSpawn.processPower', 'PowerCreep.upgrade'] },
-    'Game.resources': { summary: 'Account-level resources: pixels, CPU unlocks, access keys.', tasks: ['how many pixels do I have'], see: ['Game.cpu.generatePixel'] },
+    'Game.resources': { summary: 'Account-level resources: subscription tokens, CPU unlocks, pixels, access keys.', constants: ['INTERSHARD_RESOURCES'], tasks: ['how many pixels do I have'], see: ['Game.cpu.generatePixel'] },
     'Game.shard': { summary: 'Name and type of the current shard.', tasks: ['which shard am I on'], see: ['InterShardMemory'] },
 
     // ---------------------------------------------------------------- CPU
@@ -142,7 +142,7 @@ module.exports = {
             L('A fee of {{MARKET_FEE * 100}}% of price × amount is charged in credits when the order is created.',
                 eng(MARKETP, 'var fee = Math.ceil(intent.price * intent.totalAmount * C.MARKET_FEE);'),
                 eng(MARKETP, "bulkUsers.inc(user, 'money', -fee);")),
-            L('At most {{MARKET_MAX_ORDERS}} orders per player.',
+            L('At most {{MARKET_MAX_ORDERS}} orders per player. The return table of the reference still says 50.',
                 eng(MARKET, 'if(_.size(this.orders) + ordersCreatedDuringTick >= C.MARKET_MAX_ORDERS) {')),
             L('A sell order only fills while the terminal actually holds the resource; a buy order only while you have the credits.',
                 eng(MARKETP, 'terminal && terminal.user == order.user ? terminal.store[order.resourceType] || 0 : 0;'),
