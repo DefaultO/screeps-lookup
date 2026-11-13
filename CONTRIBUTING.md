@@ -72,6 +72,11 @@ module.exports = { CONTROLLER_DOWNGRADE_RESTORE: 'Ticks added to the downgrade t
 1. **Only what a source shows.** Every line that states behaviour carries its source: `L(text, …)`
    with `eng`, `backend`, `driver` (code) or `doc`, `article` (official docs). Read the code before
    you write the line. If the source does not settle it, leave the line out.
+   Other fetched repositories are cited with `ref('<repository>', 'path/in/repo.js', 'piece of the line')`:
+   `screeps`, `launcher`, `storage`, `renderer`, `grunt-screeps`, `tutorial-scripts`, `mod-season1`,
+   `mod-season2`, `mod-season5`, `common`. Contributed official articles are `article('contributed/ps_ubuntu')`.
+   `wiki('Page_Name')` points at a page of the community wiki. It is allowed only for practice that
+   no primary source holds, on a line that says it is community practice; nothing is copied from the wiki.
 2. **A code source is a file plus a piece of one line** of that file, copied exactly. The build
    finds the line and links to it. Pick the line that decides the behaviour, not the function head.
 3. **Numbers come from constants**: write `{{ROAD_HITS / ROAD_DECAY_AMOUNT * ROAD_DECAY_TIME}}`,

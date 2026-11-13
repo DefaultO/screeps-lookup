@@ -34,6 +34,15 @@ const REPOS = {
     engine: { github: 'screeps/engine', license: 'ISC' },
     'backend-local': { github: 'screeps/backend-local', license: 'ISC' },
     driver: { github: 'screeps/driver', license: 'ISC' },
+    screeps: { github: 'screeps/screeps', license: 'ISC' },
+    launcher: { github: 'screeps/launcher', license: 'ISC' },
+    storage: { github: 'screeps/storage', license: 'ISC' },
+    renderer: { github: 'screeps/renderer', license: 'ISC' },
+    'grunt-screeps': { github: 'screeps/grunt-screeps', license: 'MIT' },
+    'tutorial-scripts': { github: 'screeps/tutorial-scripts', license: 'none stated; linked, not copied' },
+    'mod-season1': { github: 'screeps/mod-season1', license: 'MIT' },
+    'mod-season2': { github: 'screeps/mod-season2', license: 'MIT' },
+    'mod-season5': { github: 'screeps/mod-season5', license: 'MIT' },
 };
 
 const problems = [];
@@ -388,10 +397,15 @@ function resolveEngine(refs, meta, where) {
 //   {doc: 'article:control'}     an official article (file name without .md), optionally with #anchor
 function resolveSrc(ref, meta, where, apiIds) {
     if (!ref || typeof ref !== 'object') die(`${where}: a source must be an object, got ${JSON.stringify(ref)}`);
+    if (ref.wiki) {
+        // the community wiki: a pointer for practice that no primary source holds; nothing is copied from it
+        if (!/^[A-Za-z0-9_().,'%-]+$/.test(ref.wiki)) die(`${where}: bad wiki page name "${ref.wiki}"`);
+        return { label: 'wiki: ' + ref.wiki.replace(/_/g, ' '), url: 'https://wiki.screepspl.us/' + ref.wiki, community: true };
+    }
     if (ref.doc) {
         if (ref.doc.startsWith('article:')) {
             const [slug, anchor] = ref.doc.slice(8).split('#');
-            if (!fs.existsSync(path.join(SOURCES, 'docs/source', slug + '.md'))) die(`${where}: no official article "${slug}"`);
+            if (!fs.existsSync(path.join(SOURCES, 'docs/source', slug + '.md'))) die(`${where}: no official article "${slug}" (contributed articles are article:contributed/<name>)`);
             return { label: 'docs: ' + slug, url: DOCS_URL + slug + '.html' + (anchor ? '#' + anchor : '') };
         }
         if (!apiIds.has(ref.doc)) die(`${where}: source {doc: "${ref.doc}"} is not an entry of the API reference`);

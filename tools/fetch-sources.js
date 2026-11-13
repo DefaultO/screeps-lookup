@@ -2,7 +2,9 @@
 'use strict';
 /*
  * Fetches or updates the public sources the index is built from, into sources/ (not committed):
- *   screeps/docs, screeps/common, screeps/engine, screeps/backend-local, screeps/driver
+ *   the public repositories of the screeps organisation that hold rules, the private server or tools
+ *   (docs, common, engine, driver, backend-local, screeps, launcher, storage, renderer, grunt-screeps,
+ *   tutorial-scripts, mod-season1, mod-season2, mod-season5)
  * Nothing in them is executed, except that build.js evaluates common/lib/constants.js
  * (plain data) in an empty context.
  *   node tools/fetch-sources.js [--dir <folder>]
@@ -14,7 +16,7 @@ const { execFileSync } = require('child_process');
 const argv = process.argv.slice(2);
 const i = argv.indexOf('--dir');
 const dir = path.resolve(i === -1 ? path.join(__dirname, '..', 'sources') : argv[i + 1]);
-const repos = ['docs', 'common', 'engine', 'backend-local', 'driver'];
+const repos = ['docs', 'common', 'engine', 'backend-local', 'driver', 'screeps', 'launcher', 'storage', 'renderer', 'grunt-screeps', 'tutorial-scripts', 'mod-season1', 'mod-season2', 'mod-season5'];
 
 fs.mkdirSync(dir, { recursive: true });
 for (const name of repos) {

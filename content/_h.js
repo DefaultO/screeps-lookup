@@ -19,6 +19,10 @@ module.exports = {
     backend: code('backend-local'), // screeps/backend-local, e.g. backend('lib/cronjobs.js', 'function createRaid')
     driver: code('driver'),         // screeps/driver: the runtime around a player script
     common: code('common'),         // @screeps/common
+    // any other fetched repository: ref('launcher', 'lib/start.js', 'piece of the line')
+    ref: (repo, file, find, label) => code(repo)(file, find, label),
+    // the community wiki, only for practice that no primary source holds: wiki('Remote_Harvesting')
+    wiki: page => ({ wiki: page }),
     doc: id => ({ doc: id }),                       // API reference entry: doc('Creep.transfer')
     article: slug => ({ doc: 'article:' + slug }),  // official article: article('control') or article('invaders#Raids')
 };

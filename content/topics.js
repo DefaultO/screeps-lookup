@@ -8,4 +8,8 @@ module.exports = {
     npc: 'NPCs and the world',
     power: 'Power',
     runtime: 'Code, CPU and memory',
+    platform: 'Account, web API and tools',
+    seasons: 'Seasonal worlds',
+    server: 'Private server',
+    practice: 'Practice and strategy',
 };
