@@ -1,0 +1,86 @@
+'use strict';
+// Runtime pack: one-line meanings for the return codes, the event constants, and those FIND_*, LOOK_*,
+// direction and color names that do not explain themselves.
+
+module.exports = {
+    // ---------------------------------------------------------------- return codes
+    OK: 'The call passed its checks and the action is queued for the end of the tick. It can still fail there.',
+    ERR_NOT_OWNER: 'The object, or the room it is in, is not yours to use this way.',
+    ERR_NO_PATH: 'No path or route to the target was found.',
+    ERR_NAME_EXISTS: 'The name is already in use (creep, spawn, flag or power creep).',
+    ERR_BUSY: 'The object cannot act now: a creep that is still spawning, a spawn that is already spawning, a power creep that is not in the world.',
+    ERR_NOT_FOUND: 'What the call refers to is not there: no step of the path at this position, no queued order to cancel, no parts to boost.',
+    ERR_NOT_ENOUGH_ENERGY: 'Not enough energy for the action. Same number as ERR_NOT_ENOUGH_RESOURCES.',
+    ERR_NOT_ENOUGH_RESOURCES: 'The object lacks the resource or the amount the action needs.',
+    ERR_NOT_ENOUGH_EXTENSIONS: 'Spawns and extensions hold too little energy for the body. Same number as ERR_NOT_ENOUGH_RESOURCES.',
+    ERR_INVALID_TARGET: 'The target is the wrong kind of object, does not exist, or cannot take this action.',
+    ERR_FULL: 'The target cannot take more, or a limit is reached (store, flags, construction sites, deals per tick).',
+    ERR_NOT_IN_RANGE: 'The target is too far away for this action.',
+    ERR_INVALID_ARGS: 'An argument has the wrong type or a value that is not allowed.',
+    ERR_TIRED: 'Still cooling down: fatigue of a creep or the cooldown of a structure.',
+    ERR_NO_BODYPART: 'The creep has no working body part of the kind this action needs.',
+    ERR_RCL_NOT_ENOUGH: 'The room controller level is too low for this structure or action.',
+    ERR_GCL_NOT_ENOUGH: 'Your Global Control Level does not allow one more room.',
+    ERR_ACCESS_DENIED: 'You have no access to this restricted shard. Returned by claimController, reserveController and upgradeController.',
+
+    // ---------------------------------------------------------------- events
+    EVENT_ATTACK: 'A creep, a tower or a nuke damaged something. data: targetId, damage, attackType.',
+    EVENT_OBJECT_DESTROYED: 'A creep died, or a structure was destroyed by damage. data: type.',
+    EVENT_ATTACK_CONTROLLER: 'attackController was used on the controller of the room. No data.',
+    EVENT_BUILD: 'A creep built on a construction site. data: targetId, amount, structureType, x, y, incomplete.',
+    EVENT_HARVEST: 'A creep harvested a source or a mineral. data: targetId, amount.',
+    EVENT_HEAL: 'A creep or a tower healed a creep. data: targetId, amount, healType.',
+    EVENT_REPAIR: 'A creep or a tower repaired a structure. data: targetId, amount, energySpent.',
+    EVENT_RESERVE_CONTROLLER: 'The controller was reserved. data: amount, the ticks added.',
+    EVENT_UPGRADE_CONTROLLER: 'The controller was upgraded. data: amount, energySpent.',
+    EVENT_EXIT: 'A creep left the room through an exit. data: room, x, y, where it arrives.',
+    EVENT_POWER: 'A power creep used a power. data: power, targetId.',
+    EVENT_TRANSFER: 'Resources moved from one object to another by transfer, withdraw or a link. data: targetId, resourceType, amount.',
+    EVENT_ATTACK_TYPE_MELEE: 'attackType of Creep.attack.',
+    EVENT_ATTACK_TYPE_RANGED: 'attackType of Creep.rangedAttack and of a tower attack.',
+    EVENT_ATTACK_TYPE_RANGED_MASS: 'attackType of Creep.rangedMassAttack; one event per target hit.',
+    EVENT_ATTACK_TYPE_DISMANTLE: 'attackType of Creep.dismantle.',
+    EVENT_ATTACK_TYPE_HIT_BACK: 'attackType of the damage that a creep attacked in melee, or a power bank, deals back.',
+    EVENT_ATTACK_TYPE_NUKE: 'attackType of the damage from a landing nuke.',
+    EVENT_HEAL_TYPE_MELEE: 'healType of Creep.heal.',
+    EVENT_HEAL_TYPE_RANGED: 'healType of Creep.rangedHeal and of a tower heal.',
+
+    // ---------------------------------------------------------------- FIND_*
+    FIND_EXIT_TOP: 'Open tiles on the top edge (y = 0), as positions. Same number as TOP.',
+    FIND_EXIT_RIGHT: 'Open tiles on the right edge (x = 49), as positions. Same number as RIGHT.',
+    FIND_EXIT_BOTTOM: 'Open tiles on the bottom edge (y = 49), as positions. Same number as BOTTOM.',
+    FIND_EXIT_LEFT: 'Open tiles on the left edge (x = 0), as positions. Same number as LEFT.',
+    FIND_EXIT: 'All open edge tiles of the room, as positions.',
+    FIND_CREEPS: 'All creeps in the room that have finished spawning.',
+    FIND_MY_CREEPS: 'Your creeps in the room that have finished spawning.',
+    FIND_HOSTILE_CREEPS: 'Every creep that is not yours: enemies, allies, invaders, source keepers.',
+    FIND_SOURCES_ACTIVE: 'Sources that have energy left.',
+    FIND_DROPPED_RESOURCES: 'Piles lying on the ground, of any resource.',
+    FIND_STRUCTURES: 'Every structure, with or without an owner.',
+    FIND_MY_STRUCTURES: 'Structures you own. Roads, containers and walls have no owner and are not in it.',
+    FIND_HOSTILE_STRUCTURES: 'Structures with an owner other than you. Roads, containers and walls are not in it.',
+    FIND_FLAGS: 'Your flags in the room.',
+    FIND_HOSTILE_SPAWNS: 'Spawns of other players.',
+    FIND_HOSTILE_CONSTRUCTION_SITES: 'Construction sites of other players.',
+    FIND_NUKES: 'Nukes on their way to this room.',
+    FIND_HOSTILE_POWER_CREEPS: 'Power creeps that are not yours.',
+
+    // ---------------------------------------------------------------- LOOK_*
+    LOOK_ENERGY: 'Dropped resources of any kind; the same list as LOOK_RESOURCES.',
+    LOOK_RESOURCES: 'Dropped resources on the tile.',
+    LOOK_STRUCTURES: 'All structures on the tile; a road, a rampart and a building can share one.',
+    LOOK_TERRAIN: 'The terrain of the tile as the string "plain", "swamp" or "wall".',
+
+    // ---------------------------------------------------------------- directions
+    TOP: 'Up: y − 1.',
+    TOP_RIGHT: 'x + 1, y − 1.',
+    RIGHT: 'x + 1.',
+    BOTTOM_RIGHT: 'x + 1, y + 1.',
+    BOTTOM: 'Down: y + 1.',
+    BOTTOM_LEFT: 'x − 1, y + 1.',
+    LEFT: 'x − 1.',
+    TOP_LEFT: 'x − 1, y − 1.',
+
+    // ---------------------------------------------------------------- colors
+    COLORS_ALL: 'List of the ten COLOR_* values; a flag color must be one of them.',
+};
