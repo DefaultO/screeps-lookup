@@ -19,6 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
+const Figures = require('../lib/figures.js');
+const GameArt = require('../lib/gameart.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const argv = process.argv.slice(2);
@@ -436,10 +438,10 @@ function loadContent() {
     }
     const load = file => (fs.existsSync(file) ? require(file) : null);
     const list = x => (!x ? { entries: [], extend: {} } : Array.isArray(x) ? { entries: x, extend: {} } : { entries: x.entries || [], extend: x.extend || {} });
-    return [{ name: 'content', api: require(path.join(dir, 'api.js')), mechanics: list(require(path.join(dir, 'mechanics.js'))), recipes: list(require(path.join(dir, 'recipes.js'))), notes: load(path.join(dir, 'constant-notes.js')) }]
+    return [{ name: 'content', api: require(path.join(dir, 'api.js')), mechanics: list(require(path.join(dir, 'mechanics.js'))), recipes: list(require(path.join(dir, 'recipes.js'))), notes: load(path.join(dir, 'constant-notes.js')), figures: load(path.join(dir, 'figures.js')) }]
         .concat(packs.map(p => {
             const d = path.join(packsDir, p);
-            return { name: 'packs/' + p, pack: p, api: load(path.join(d, 'api.js')), mechanics: list(load(path.join(d, 'mechanics.js'))), recipes: list(load(path.join(d, 'recipes.js'))), notes: load(path.join(d, 'constant-notes.js')) };
+            return { name: 'packs/' + p, pack: p, api: load(path.join(d, 'api.js')), mechanics: list(load(path.join(d, 'mechanics.js'))), recipes: list(load(path.join(d, 'recipes.js'))), notes: load(path.join(d, 'constant-notes.js')), figures: load(path.join(d, 'figures.js')) };
         }));
 }
 
@@ -552,7 +554,6 @@ function applyContent(entries, constants, meta) {
             if (!m.title || !m.summary) die(`${where}: title and summary are required`);
             const e = { id, kind: 'mechanic', name: m.title, title: m.title, topic: m.topic || c.pack || 'core', summary: fill(m.summary, where), url: m.url || undefined };
             addCommon(e, m, where);
-            if (m.viz) e.viz = m.viz;
             if (m.basis) e.basis = basis(m.basis, where);
             made.set(id, e); mechEntries.push(e);
         }
@@ -584,7 +585,35 @@ function applyContent(entries, constants, meta) {
         for (const s of e.steps || []) if (s.call && !ids.has(s.call)) die(`${e.id}: step calls unknown entry ${s.call}`);
         if (e.see) e.see = e.see.filter(s => s !== e.id);
     }
-    return { entries: all, notes };
+
+    // 5. figures: content/figures.js and content/packs/<name>/figures.js give {entry id: [figure, ...]},
+    //    as an object or as a function of (constants, helpers). Every figure is drawn once here, so a
+    //    figure that cannot be drawn stops the build; layout remarks (labels that overlap) are warnings.
+    const F = Figures.create(constants, GameArt.create(require('../lib/gameart-assets.js')));
+    const byAll = new Map(all.map(e => [e.id, e]));
+    let figureCount = 0;
+    for (const c of content) {
+        if (!c.figures) continue;
+        // a figure that reads a constant that does not exist stops the build instead of drawing NaN
+        const strict = new Proxy(constants, { get: (t, k) => { if (typeof k === 'string' && !(k in t)) die(`${c.name}/figures: unknown constant ${k}`); return t[k]; } });
+        const set = typeof c.figures === 'function' ? c.figures(strict, require(path.join(ROOT, 'content/_fig.js'))(strict)) : c.figures;
+        for (const [id, figs] of Object.entries(set)) {
+            const e = byAll.get(id);
+            if (!e && ONLY_PACK && !c.pack) continue;   // a base figure for an entry of a pack that is left out of this build
+            if (!e) die(`${c.name}/figures: no entry "${id}" (use the full id, e.g. mechanic:tower or Creep.harvest)`);
+            [].concat(figs).forEach((fig, i) => {
+                const where = `${c.name}/figures: ${id} [${i + 1}]`;
+                if (fig && typeof fig.title === 'string') fig.title = fill(fig.title, where);
+                if (fig && typeof fig.caption === 'string') fig.caption = fill(fig.caption, where);
+                const res = F.check(fig);
+                if (res.errors.length) die(`${where}: ${res.errors.join('; ')}`);
+                res.warnings.forEach(w => warn(`${where}: ${w}`));
+                (e.figures = e.figures || []).push(fig);
+                figureCount++;
+            });
+        }
+    }
+    return { entries: all, notes, figureCount };
 }
 
 // ---------------------------------------------------------------- output
@@ -649,6 +678,7 @@ function main() {
                 ' come from the Screeps documentation (docs.screeps.com, CC BY 4.0, shortened). Constant values come from @screeps/common; behaviour notes cite screeps/engine, screeps/driver and screeps/backend-local (ISC, © Artem Chivchalov). Summaries, tasks, pitfalls, mechanics and recipes are written for this index. Not affiliated with Screeps.',
             sources: meta,
             counts,
+            figures: applied.figureCount,
             topics: require(path.join(ROOT, 'content/topics.js')),
         },
         constants,
@@ -671,12 +701,14 @@ function main() {
     const tpl = path.join(ROOT, 'site-src/index.html');
     if (fs.existsSync(tpl)) {
         const search = fs.readFileSync(path.join(ROOT, 'lib/search.js'), 'utf8');
-        const html = fs.readFileSync(tpl, 'utf8').replace('/*__SEARCH_JS__*/', () => search);
+        const figures = fs.readFileSync(path.join(ROOT, 'lib/figures.js'), 'utf8');
+        const html = fs.readFileSync(tpl, 'utf8').replace('/*__SEARCH_JS__*/', () => search).replace('/*__FIGURES_JS__*/', () => figures)
+            .replace('/*__GAMEART_JS__*/', () => fs.readFileSync(path.join(ROOT, 'lib/gameart-assets.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'lib/gameart.js'), 'utf8'));
         fs.writeFileSync(path.join(siteDir, 'index.html'), html);
     }
 
     const total = entries.length;
-    console.log(`index: ${total} entries (${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}), ${Object.keys(constants).length} constants, ${(json.length / 1024).toFixed(0)} KB` + (ONLY_PACK ? `  [base + pack ${ONLY_PACK}]` : '') + (OUT ? `  -> ${OUT}` : ''));
+    console.log(`index: ${total} entries (${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}), ${applied.figureCount} figures, ${Object.keys(constants).length} constants, ${(json.length / 1024).toFixed(0)} KB` + (ONLY_PACK ? `  [base + pack ${ONLY_PACK}]` : '') + (OUT ? `  -> ${OUT}` : ''));
     for (const [name, m] of Object.entries(meta)) console.log(`  ${name}: ${m.commit ? m.commit.slice(0, 10) : '?'} ${m.date || ''} ${m.version ? 'v' + m.version : ''}`);
     if (problems.length) {
         console.log(`${problems.length} warning(s):`);

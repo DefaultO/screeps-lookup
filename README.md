@@ -2,7 +2,9 @@
 
 A reference for Screeps that you query by task. You describe what you want to do; you get the
 calls and rules that apply, each with its signature, CPU cost, return codes, the constants involved,
-the usual mistakes, and the line of the game's source code that proves each statement.
+the usual mistakes, and the line of the game's source code that proves each statement. Where a
+drawing explains a rule faster, the entry has one: 332 figures, the scenes drawn with the game's
+own graphics.
 The same index serves a command for the terminal (and for Claude sessions) and a static web page.
 
 ## Use it
@@ -26,14 +28,18 @@ The page is `site/index.html` with `site/index.js` next to it. Open the file, or
 `node tools/serve.js` and go to <http://localhost:4173/>. No backend, no external requests; any
 static host works. Links keep their state: `#q=refill a spawn`, `#e=Creep.transfer`.
 
-- Start page: the numbers most questions end in (life times, decay, tower, reservation, CPU), each
-  linked to the entry that explains it, then recipes and mechanics by topic.
-- Left rail: browse recipes and mechanics by topic, every API object and the constant groups.
-- Answers: the first result is opened with signature, CPU cost, a tile grid for the range, the
-  matching lines highlighted, return codes and constants; the others are one-line rows.
-- Every sourced line ends in a small chip such as `engine tick.js:51` that opens that line on GitHub.
-- Entry pages: arguments, every return code, member tables for objects, computed tables and a
-  chart (tower effect by range) where numbers are easier to read drawn.
+- Start page: the guides by topic, two figures, the numbers most questions end in (life times,
+  decay, tower, reservation, CPU) and the API objects.
+- Sidebar: the sections (ten topics of guides, five groups of API objects, the constants); the
+  entries of the current section are listed under it. Each section has a page that lists its entries.
+- Answers: the first result is opened with signature, cost, the lines that answer the question, a
+  figure, return codes and constants; the others are short rows.
+- Entry pages: one line of key facts under the title, figures, steps or facts, pitfalls, arguments,
+  every return code, member tables for objects, computed tables. "On this page" lists the sections.
+- Every sourced line carries small numbers that open the proving line on GitHub; the list is at the
+  end of the entry.
+- Figures (`#f=all`): every drawing, by section. Scenes show the game's own objects on the tile grid;
+  charts, timelines and diagrams follow the light or dark theme.
 - Keys: `/` focuses the search, `↑` `↓` pick a result, `Enter` opens it, `Esc` clears.
 
 ### For a Claude session working on a bot
@@ -52,6 +58,7 @@ Put this in the project's `CLAUDE.md` (adjust the path):
 | mechanic | 68 | rules that span calls, in nine topics: core rules, structures and creeps, resources and trade, NPCs and the world, power, code/CPU/memory, account/web API/tools, seasonal worlds, private server |
 | recipe | 64 | the calls a job needs, in order; 18 of them are marked as community practice |
 | constants | 23 groups | all 423 constants of `@screeps/common` with values and a one-line meaning, plus computed tables |
+| figure | 332 | drawings attached to entries: scenes on the tile grid in the game's own graphics, charts, timelines, diagrams, body layouts |
 | article | 18 | titles and section names of the official articles, as link targets |
 | glossary | 41 words | the community's words, each pointing at the entry that explains it |
 
@@ -73,7 +80,9 @@ their advice says "community practice" and points at the wiki page that describe
 
 ```sh
 node tools/fetch-sources.js     # clone or update 14 public screeps repositories into sources/
+node tools/art.js               # only when the renderer changed: rebuilds lib/gameart-assets.js from its images
 node tools/build.js             # writes data/index.json, site/index.js, site/index.html
+node tools/shots.js --all       # PNG sheets of the figures, to look at them (needs Chrome or Edge)
 node tools/test.js              # 325 task queries with the entries they must find, plus index checks
 node tools/audit.js --list      # what is still thin: members without own text, lines without a source, constants without a meaning
 ```
@@ -106,7 +115,10 @@ Numbers are written as expressions over the constants.
 | `content/topics.js` | names and order of the topics that group mechanics and recipes |
 | `content/cheatsheet.js` | the numbers on the start page |
 | `content/synonyms.js` | word groups ("refill", "fill", "supply" → transfer), phrases ("do not own"), stop words |
-| `site-src/index.html` | the page template; the build inlines `lib/search.js` into it |
+| `content/figures.js`, `content/packs/<topic>/figures.js` | the figures, as data: scenes, charts, timelines, diagrams |
+| `lib/figures.js` | draws a figure from its data; used by the page and by the build, which checks every figure |
+| `lib/gameart.js`, `lib/gameart-assets.js` | the game's own graphics as inline SVG, ported from `screeps/renderer` |
+| `site-src/index.html` | the page template; the build inlines the three `lib` scripts into it |
 | `test/queries.json` | `{"q": "...", "first": "id"}` or `{"q": "...", "expect": ["id"], "top": 3}` |
 
 When a search misses: add the wording as a task line on the right entry, or the word to a synonym
@@ -134,7 +146,9 @@ run time. The per-line sources in the index are what a later answer layer would 
   return codes and a shortened first sentence of descriptions, credits the source on the page and
   in `NOTICE.md`, and links every entry to its official page.
 - **Code repositories of the screeps organisation** (ISC or MIT; `tutorial-scripts` states none):
-  constant values are copied from `@screeps/common`; everything else is linked by line, not copied.
+  constant values are copied from `@screeps/common`, and the images and the composition of the game's
+  objects from `screeps/renderer` (ISC, with its copyright notice kept in the file and in `NOTICE.md`);
+  everything else is linked by line, not copied.
 - **Community wiki** (wiki.screepspl.us): states no license. Nothing is copied from it; it was a
   list of topics, and practice entries link to its pages.
 - This folder has no license of its own yet. Details are in [NOTICE.md](NOTICE.md).

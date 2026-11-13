@@ -20,11 +20,13 @@ Changes made: text shortened to one sentence, markup removed. Every entry links 
 | --- | --- | --- |
 | `screeps/common` | ISC | the values of `lib/constants.js`; other files are linked by line |
 | `screeps/engine`, `screeps/driver`, `screeps/backend-local` | ISC | linked by line as proof of behaviour; no code is copied |
-| `screeps/screeps`, `screeps/launcher`, `screeps/storage`, `screeps/renderer` | ISC | linked by line (private server) |
+| `screeps/screeps`, `screeps/launcher`, `screeps/storage` | ISC | linked by line (private server) |
+| `screeps/renderer` | ISC | the images of the game's objects (`metadata/images`, cleaned, in `lib/gameart-assets.js`) and the way each object is composed (`metadata/src/objects`, ported to SVG in `lib/gameart.js`); the drawings of the site are made of them |
 | `screeps/grunt-screeps`, `screeps/mod-season1`, `screeps/mod-season2`, `screeps/mod-season5` | MIT | linked by line |
 | `screeps/tutorial-scripts` | none stated | linked by line only; nothing is copied |
 
-ISC notice for the constant values:
+ISC notice for the constant values and for the renderer's images and code (the same notice is at the
+top of `lib/gameart-assets.js`, which the built page contains):
 
     Copyright (c) 2016, Artem Chivchalov <contact@screeps.com>
 
