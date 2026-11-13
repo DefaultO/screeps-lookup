@@ -570,7 +570,14 @@ module.exports = {
         constants: ['INVADER_CORE_HITS', 'INVADER_CORE_CONTROLLER_POWER', 'STRONGHOLD_DECAY_TICKS', 'INVADER_CORE_EXPAND_TIME'],
         see: ['mechanic:invaders', 'Creep.attack', 'Creep.attackController'],
     },
-    StructureKeeperLair: { summary: 'Spawns a Source Keeper next to a source or mineral in the centre rooms of a sector.', tasks: ['when does a source keeper respawn'], see: ['StructureKeeperLair.ticksToSpawn'] },
+    StructureKeeperLair: {
+        summary: 'Keeps one Source Keeper next to a source or mineral in the middle rooms of a sector. When its keeper is hurt or gone it counts {{ENERGY_REGEN_TIME}} ticks and then puts a fresh one in its place.',
+        tasks: ['when does a source keeper respawn'],
+        notes: [L('The timer starts as soon as the keeper is missing or below full hits, not when it dies. A keeper still alive when the timer ends is replaced.',
+            eng('src/processor/intents/keeper-lairs/tick.js', 'if(!keeper || keeper.hits < 5000) {'), eng('src/processor/intents/keeper-lairs/tick.js', 'bulk.remove(keeper._id);'))],
+        constants: ['ENERGY_REGEN_TIME'],
+        see: ['StructureKeeperLair.ticksToSpawn'],
+    },
     'StructureKeeperLair.ticksToSpawn': { summary: 'Ticks until the next keeper appears at this lair.', tasks: ['time until the keeper respawns'] },
     StructurePortal: { summary: 'Teleports a creep that steps on it to another room or another shard.', tasks: ['travel to another shard', 'use a portal'], constants: ['PORTAL_DECAY'], see: ['InterShardMemory'] },
 };
