@@ -93,6 +93,10 @@ module.exports = { CONTROLLER_DOWNGRADE_RESTORE: 'Ticks added to the downgrade t
 8. Values of ids, constants and code go in backticks only when they are literal code in the text.
 9. Do not describe what a mod or a private-server setting might change; the index follows the
    public sources.
+10. An entry about what players do rather than what the game enforces (layouts, priorities,
+    tooling) gets `basis: 'practice'`. Its numbers are still computed from constants and its
+    statements about the game still carry code sources; advice lines say "community practice"
+    and may point to a wiki page.
 
 ## Check your work
 

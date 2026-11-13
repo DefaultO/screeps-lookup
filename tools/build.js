@@ -528,6 +528,9 @@ function applyContent(entries, constants, meta) {
         groupEntries.push({ id: 'const:other', kind: 'constants', name: 'Other constants', title: 'Other constants', summary: 'Constants not sorted into a group yet.', tasks: [], constants: rest.map(constEntry), url: DOCS_API_URL + '#Constants' });
     }
 
+    // basis: 'practice' marks an entry as what players do, not what the game enforces
+    const basis = (b, where) => { if (b !== 'practice') die(`${where}: basis must be 'practice' or absent`); return b; };
+
     // 3. mechanics and recipes: new ones, then additions to existing ones
     const made = new Map();
     const mechEntries = [], recipeEntries = [];
@@ -539,6 +542,7 @@ function applyContent(entries, constants, meta) {
             const e = { id, kind: 'mechanic', name: m.title, title: m.title, topic: m.topic || c.pack || 'core', summary: fill(m.summary, where), url: m.url || undefined };
             addCommon(e, m, where);
             if (m.viz) e.viz = m.viz;
+            if (m.basis) e.basis = basis(m.basis, where);
             made.set(id, e); mechEntries.push(e);
         }
         for (const r of c.recipes.entries) {
@@ -547,6 +551,7 @@ function applyContent(entries, constants, meta) {
             if (!r.title || !r.summary || !r.steps || !r.steps.length) die(`${where}: title, summary and steps are required`);
             const e = { id, kind: 'recipe', name: r.title, title: r.title, topic: r.topic || c.pack || 'core', summary: fill(r.summary, where), steps: r.steps.map(s => ({ call: s.call || undefined, text: fill(s.text, where) })), url: r.url || undefined };
             addCommon(e, r, where);
+            if (r.basis) e.basis = basis(r.basis, where);
             made.set(id, e); recipeEntries.push(e);
         }
     }

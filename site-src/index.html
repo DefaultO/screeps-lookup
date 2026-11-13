@@ -170,6 +170,7 @@ td.up { font-weight: 700; color: var(--ink); }
 .consts .cn { flex-basis: 100%; margin: 0 0 2px; color: var(--ink-3); font-size: 13px; }
 .cite { font: 500 10.5px/1.5 var(--mono); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; white-space: nowrap; vertical-align: 1px; }
 .cite:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+.cite.wiki { border-style: dashed; }
 .codes { display: flex; flex-wrap: wrap; gap: 5px; }
 .codes span { font: 12px var(--mono); padding: 1px 7px; border-radius: 5px; background: var(--code); color: var(--ink-2); }
 .codes span b { color: var(--ink-3); font-weight: 500; margin-left: 4px; }
@@ -349,13 +350,14 @@ footer { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12.5
     var p = '';
     if (e.kind === 'method' && e.cpu === 'intent') p += '<span class="pill cost" title="An action: costs 0.2 CPU on top of its run time when it returns OK">0.2 CPU</span>';
     if (e.deprecated) p += '<span class="pill dep">deprecated</span>';
+    if (e.basis === 'practice') p += '<span class="pill" title="What players do, not a rule the game enforces">practice</span>';
     return p;
   }
   function section(name, html, cls) { return '<section class="sec' + (cls ? ' ' + cls : '') + '"><h3 class="sh">' + esc(name) + '</h3>' + html + '</section>'; }
   // links to what proves a line: engine code at a line number, or a page of the official docs
   function cites(list) {
     if (!list || !list.length) return '';
-    return ' ' + list.map(function (s) { return '<a class="cite" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
+    return ' ' + list.map(function (s) { return '<a class="cite' + (s.community ? ' wiki' : '') + '" href="' + esc(s.url) + '" target="_blank" rel="noopener" title="' + esc(s.community ? 'Community wiki, not a primary source: ' + s.label : s.label) + '">' + esc(s.label.replace(/^docs: /, '')) + '</a>'; }).join(' ');
   }
   // items: [{t, src}]
   function lineList(items, mk, cls) { return '<ul class="lines' + (cls ? ' ' + cls : '') + '">' + items.map(function (x) { return '<li>' + rich(x.t, mk) + cites(x.src) + '</li>'; }).join('') + '</ul>'; }

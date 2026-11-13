@@ -65,6 +65,7 @@ function headline(e) {
     if (e.range !== undefined) bits.push('range ' + e.range);
     if (e.part) bits.push('needs ' + e.part);
     if (e.deprecated) bits.push('DEPRECATED');
+    if (e.basis === 'practice') bits.push('community practice, not a game rule');
     return `${e.title || e.id}  [${bits.join(' · ')}]`;
 }
 
